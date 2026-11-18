@@ -133,7 +133,22 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
     - no console errors
   - Screenshots, checked by eye: `.screenshots/ai-08-checkpoint-{light,dark}-marker.png`, `-confirm.png` (dialog open) and `-restored.png` (event emitted).
   - `bun run typecheck`: exit 0 on two clean runs; `bun test`: 4 pass. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
-- [ ] Thinking state and preview toolbar.
+- [x] Thinking state and preview toolbar.
+
+  - `components/ai/Thinking.tsx`: `{label?: string}` (default "Thinking").
+    - A StyleX keyframe sweeps a gradient between the `--color-text-secondary` and `--color-text-primary` tokens across the text (`background-clip: text`, 2s linear, infinite). It doesn't animate under `prefers-reduced-motion`.
+    - It is built on Astryx `Text` (supporting, block), so its line box matches the text that replaces it. It sits in a `role="status"` wrapper.
+  - `components/ai/PreviewToolbar.tsx`: `{url: string; status: 'loading' | 'ready' | 'error'; onRefresh(): void}` on Astryx `Toolbar`.
+    - A `StatusDot` shows the status: neutral and pulsing while loading, success when ready, error on failure. Each dot carries a label ("Preview loading", "Preview ready", "Preview failed to load").
+    - A ghost refresh `IconButton` calls `onRefresh`, and an open-in-new-tab `IconButton` links to `url` (`noopener noreferrer`).
+    - It matches the toolbar already in `Workspace.tsx`, which this replaces at wire-up.
+  - Checked in the browser:
+    - the swap demo alternates "Thinking" and a reply line every 2s, and the line below stays at y=452 every time over 6 samples: no layout jump
+    - the shimmer's computed `animation` is the keyframe, 2s
+    - all 3 dot labels are present; no console errors
+  - Two jumps found and fixed on the way: an inline element sat on the same line as the next one, and a body-line-height strut added 4px. Building on `Text` matches the metrics.
+  - Screenshots, checked by eye: `.screenshots/ai-09-thinking-toolbar-light.png` and `.screenshots/ai-09-thinking-toolbar-dark.png` (thinking alone, the swap demo, and the toolbar loading, ready and error).
+  - `bun run typecheck`: exit 0 on two clean runs; `bun test`: 4 pass. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
 - [ ] Wire-up: only once the AI loop has that data, swap mocks for live data in the chat panel and connect approve/deny/restore callbacks; list anything still on mocks.
 
 ## Questions for the founder

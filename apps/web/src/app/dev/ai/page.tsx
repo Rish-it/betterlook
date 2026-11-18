@@ -6,6 +6,7 @@ import {notFound} from 'next/navigation';
 import * as stylex from '@stylexjs/stylex';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {VStack} from '@astryxdesign/core/Layout';
+import {colorVars, radiusVars} from '@astryxdesign/core/theme/tokens.stylex';
 import * as f from '@/components/ai/fixtures';
 import {Code} from '@/components/ai/Code';
 import {Conversation} from '@/components/ai/Conversation';
@@ -16,12 +17,15 @@ import {ApprovalCard} from '@/components/ai/ApprovalCard';
 import {VerifyResult} from '@/components/ai/VerifyResult';
 import {DiffView} from '@/components/ai/DiffView';
 import {Checkpoint} from '@/components/ai/Checkpoint';
+import {Thinking} from '@/components/ai/Thinking';
+import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
 import type {TurnEvent} from '@/lib/agent/types';
 import {Composer} from '@/composer/Composer';
 
 const styles = stylex.create({
   main: {maxWidth: 880, marginInline: 'auto', padding: 16, paddingBlockEnd: 96},
   chatFrame: {height: 560, display: 'flex', flexDirection: 'column'},
+  toolbarFrame: {borderRadius: radiusVars['--radius-container'], backgroundColor: colorVars['--color-background-surface']},
 });
 
 function State({label, children}: {label: string; children: ReactNode}) {
@@ -95,6 +99,28 @@ function ApprovalStates() {
         <Code language="json" code={JSON.stringify(events, null, 2)} />
       </State>
     </>
+  );
+}
+
+function ThinkingSwap() {
+  const [isDone, setIsDone] = useState(false);
+  useEffect(() => {
+    const id = setInterval(() => setIsDone(d => !d), 2000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div data-testid="thinking-swap">
+      {isDone ? (
+        <Text type="supporting" display="block">
+          Done. The nav is sticky now.
+        </Text>
+      ) : (
+        <Thinking />
+      )}
+      <Text type="supporting" color="secondary" display="block">
+        Next line stays put.
+      </Text>
+    </div>
   );
 }
 
@@ -185,15 +211,20 @@ export default function AiDevPage() {
         </Section>
 
         <Section title="Thinking state">
-          <State label="model working">
-            <Fixture value={{label: 'Thinking'}} />
+          <State label="model working (sweeps; static under reduced motion)">
+            <Thinking />
+          </State>
+          <State label="in a message, before the first token, then replaced by text in the same line box">
+            <ThinkingSwap />
           </State>
         </Section>
 
         <Section title="Preview toolbar">
           {f.previewStatuses.map(status => (
             <State key={status} label={status}>
-              <Fixture value={{url: f.previewUrl, status}} />
+              <div {...stylex.props(styles.toolbarFrame)}>
+                <PreviewToolbar url={f.previewUrl} status={status} onRefresh={() => {}} />
+              </div>
             </State>
           ))}
         </Section>
