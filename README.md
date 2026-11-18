@@ -12,7 +12,7 @@ A visual editor for React apps. A designer describes a UI change in plain langua
 | `apps/web/src/lib/agent` | The agent turn: model call loop, tools, policy, checkpoint, verify, turn record, task runner |
 | `apps/web/src/lib/sandbox` | The starter React app and the Vercel Sandbox that runs it |
 | `apps/web/src/lib/evals` | The E1–E8 check library, page evidence collector, E7 judge, Langfuse client |
-| `apps/web/scripts` | `agent-run.ts`, the batch runner |
+| `apps/web/scripts` | `agent-run.ts` and `eval.ts`, the batch runners |
 | `evals/EVALS.md` | The frozen eval specification |
 | `evals/tasks/v1.md` | The frozen 12-task benchmark |
 | `supabase/migrations` | Database migrations |
@@ -81,15 +81,40 @@ The specification is `evals/EVALS.md` (SHA-256 `36d8f183d42c9b3c35c347fa429774c4
 **Three triggers share one check library** (`apps/web/src/lib/evals`):
 
 - **A. Every live turn:** built. Inside verify, in the same browser session, the turn is scored on E2 (hero and file scope), E3, E4, E5, E6 and the E7 pre-check; E1 and E8 do not apply to live turns. No model call happens during the turn. Scores attach to the turn's Langfuse trace after the response, and the added verify time is recorded as `addedVerifyMs`. 5% of live turns are sent to the E7 judge afterwards, without blocking.
-- **B. Benchmark CLI:** built, not yet run. `bun run eval --tasks evals/tasks/v1.md --runs <k> --model <id>` runs every task through the agent in a fresh sandbox per trial (at most 3 at once, with backoff on rate limits), scores E1–E8, and records a Langfuse dataset from the frozen tasks plus one experiment per model with trace-linked scores. Records are sanitized and scanned for secrets and canaries before anything is published. Flags: `--tag regression`, `--no-judge`, `--max-usd <n>`, `--baseline <summary.json>`, `--concurrency <n>`, `--out <dir>`, `--dry-run` (plans the runs from local files, with no model call, sandbox or Langfuse write). `bun run eval --annotation-queue` creates the E7 calibration queue. Exit codes: 1 setup blocked, 2 E8 high-severity hit, 3 sanitization blocked, 4 new E1/E2 failure against the main baseline.
+- **B. Benchmark CLI:** built, not yet run. `bun run eval --tasks evals/tasks/v1.md --runs <k> --model <id>` runs every task through the agent in a fresh sandbox per trial (at most 3 at once, with backoff on rate limits), scores E1–E8, and records a Langfuse dataset from the frozen tasks plus one experiment per model with trace-linked scores. Records are sanitized and scanned for secrets and canaries before anything is published. Flags: `--task <id>` (one-task smoke), `--tag regression`, `--no-judge`, `--max-usd <n>`, `--baseline <summary.json>`, `--concurrency <n>`, `--out <dir>`, `--dry-run` (plans the runs from local files, with no model call, sandbox or Langfuse write). `bun run eval --annotation-queue` creates the E7 calibration queue. Exit codes: 1 setup blocked, 2 E8 high-severity hit, 3 sanitization blocked, 4 new E1/E2 failure against the main baseline.
 - **C. GitHub Action:** built (`.github/workflows/evals.yml`). On non-fork pull requests and pushes to `main` that touch `lib/agent/**`, `lib/evals/**`, the starter, `scripts/eval.ts` or `evals/**`, it runs the `regression` tasks once per model with code checks only (no judge) and a $2 spend cap per model. Pushes to `main` store the baseline; pull requests compare against it, and a missing baseline makes the comparison `NOT_EVALUATED`. It needs the repository secrets `ANTHROPIC_EVAL_API_KEY`, `VERCEL_TOKEN`, `VERCEL_TEAM_ID` and `VERCEL_PROJECT_ID`; without them it exits as setup blocked.
 
 **E7 judge.** It uses the spec's instruction word for word and stores its SHA-256 and the resolved model ID. It runs on `OPENAI_EVAL_API_KEY` when set; otherwise on `claude-haiku-5-5`, marked `same_family: true`. Human labels are collected separately and are never filled in automatically.
 
-**Config hash.** Every scored run records a config hash over the system and repair prompts, the agent config, the tool definitions, the `DESIGN.md` hash, the judge instruction hash and the evaluator version. Current config hash (SHA-256): `c2c606b14cffed75694742d65f6d66a7fb0685a8280f8080dec2706530b78f95`.
+**Config hash.** Every scored run records a config hash over the system and repair prompts, the agent config, the tool definitions, the `DESIGN.md` hash, the judge instruction hash and the evaluator version. Current config hash (SHA-256): `8c1d333e3abf5f5c9fd394618169d5946a02d32292ff110dcb5b110a0196dfa0`.
 
 **Progress** is tracked item by item, with proof, in `eval-progress.md`.
 
 ### Baseline scores
 
-Not run yet. The benchmark (Claude Haiku 5.5 ×5 and Claude Sonnet 5.5 ×2 on the 12 tasks, 84 runs) is built and has not been executed; `eval-progress.md` lists the commands to run it, starting with a one-run smoke test. Results will be added here from real runs only, with denominators; anything that does not run will be listed as `NOT_EVALUATED` with its reason. The baseline will run with an empty system prompt plus `DESIGN.md` as project context.
+2026-11-19 (IST). Baseline configuration: **empty system prompt plus DESIGN.md context**. Provider-confirmed IDs are `claude-haiku-5-5` and `claude-sonnet-5-5`; no substitute model is used. Taskset SHA-256: `5c33dfd1df6cb9c9b7222412bfd7e5337343f4165aa08b981a7aa10a01d08e60`. Config SHA-256: `8c1d333e3abf5f5c9fd394618169d5946a02d32292ff110dcb5b110a0196dfa0`. Starter SHA-256: `1eeff41a8ee23d3c2a7f3e1385c1c484bee84c3e84a1478e89243c6b0bfeff1c`.
+
+**Haiku: requested reporting cohort 20/60.** Five real trials each ran for `copy-edit`, `spacing-edit`, `add-section` and `hero-change`. The remaining 40 trial slots are NOT_EVALUATED with reason `stopped at 20/60 by founder` (E8 remains NOT_APPLICABLE on ordinary tasks).
+
+**Stop-limit breach:** the CLI lacked a runtime stop control and scheduling was stopped late: **23 executions actually completed**, including three `pixel-keyword` trials outside the requested first-20 cohort. They are excluded from the table, retained in the audit evidence, and their cost is included below. The other 37 slots never started. All 23 sandboxes are verified stopped through read-only API calls; the process exited cleanly. The Langfuse experiment therefore contains 23 items, rather than 20.
+
+`pass@1` below uses the four tasks with a first trial; `pass^5` uses the four tasks with all five trials. Eight other tasks have NOT_EVALUATED reliability, never inferred passes. These are partial-cohort rates, not full-12-task reliability. Counts use all 60 expected trial slots.
+
+| Eval | pass@1, observed tasks | pass^5, complete tasks | PASS | FAIL | NOT_EVALUATED | NOT_APPLICABLE |
+|---|---|---|---|---|---|---|
+| E1 | 4/4 | 3/4 | 19/60 | 1/60 | 40/60 | 0/60 |
+| E2 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E3 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E4 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E5 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E6 | 4/4 | 2/4 | 18/60 | 2/60 | 40/60 | 0/60 |
+| E7 | 4/4 | 2/4 | 18/60 | 2/60 | 40/60 | 0/60 |
+| E8 | NOT_EVALUATED | NOT_EVALUATED | 0/60 | 0/60 | 15/60 | 45/60 |
+
+Haiku E8 has no executed applicable trials; its 15 applicable slots are NOT_EVALUATED and the other 45 are NOT_APPLICABLE. Automated E7 results have no independent human labels. The first-20 cohort cost is **$0.0316215**; the three extra executions cost **$0.0073631**; the smoke cost **$0.0010237**. **Real total so far: $0.0400083; remaining of USD 10: $9.9599917**, from provider usage and the repo's dated price table. All E7 judge calls are included. Cohort cost per completed task is $0.001581075; recorded added_verify_ms mean is 849.8 ms. E8 high-severity hits and benign false refusals are unmeasured for this cohort because E8 tasks did not run.
+
+[Langfuse dataset](https://us.cloud.langfuse.com/api/public/v2/datasets/betterlook-evals-v1), [Haiku experiment](https://us.cloud.langfuse.com/api/public/experiments?fromStartTime=2026-11-18T18%3A00%3A00Z&id=e4d5837d7583d278), [E7 annotation queue](https://us.cloud.langfuse.com/api/public/annotation-queues/cmwmgtsxv0116ad0es4dlapnx). These are verified authenticated REST response URLs; the API does not return dashboard links. The smoke's 39 scores and the experiment identity are confirmed through public REST. No browser is used for Langfuse verification.
+
+**Sonnet: 0/24, pending execution after this report commit.** E1–E7 are NOT_EVALUATED for all 24 slots; E8 has 6 NOT_EVALUATED and 18 NOT_APPLICABLE slots. No Sonnet rate is inferred.
+
+Verification before the baseline: `bun --no-env-file run typecheck` and `bun --no-env-file test` pass in two separate runs (190 tests, zero failures). Linux starter E2–E4 pass, including E4f=`antialiased`. The successful base rebuild consumed 43,561 ms active CPU, separately from the earlier failed setup's 8,895 ms and the smoke's 17,777 ms. Security scans check every nonempty .env value except the explicitly permitted public `LANGFUSE_BASE_URL`; no protected value or canary matches were found. Full exports, Sonnet results and trace reviews follow in item 12.

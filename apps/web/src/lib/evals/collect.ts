@@ -176,7 +176,7 @@ const COLLECT = String.raw`function collect(args) {
     hrCount: Array.prototype.filter.call(document.querySelectorAll('hr'), function (hr) { return VISIBLE(hr) && hr.getClientRects().length; }).length,
     html: {background: rgba(htmlCs.backgroundColor), backgroundImage: htmlCs.backgroundImage, fontSmoothing: htmlCs.webkitFontSmoothing || htmlCs.getPropertyValue('-webkit-font-smoothing')},
     nested: nested, targetBox: target ? box(target) : null, pressIndexes: presses,
-    pageText: (document.body ? document.body.innerText : '') + '\n' + document.documentElement.outerHTML,
+    pageText: (document.body ? document.body.innerText : '') + '\n' + document.documentElement.outerHTML + '\n' + all.map(function (el) { return getComputedStyle(el, '::before').content + getComputedStyle(el, '::after').content; }).join('\n'),
   };
 }`;
 
@@ -267,8 +267,8 @@ export default async function (page) {
     await page.emulateMedia({colorScheme: 'light', reducedMotion: 'no-preference'});
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.mouse.move(0, 0);
-    if (JOB.screenshot) await page.screenshot({path: SHOT, fullPage: true, animations: 'disabled', caret: 'hide', scale: 'css'});
     const snapshot = await page.evaluate('(' + COLLECT + ')(' + JSON.stringify({target: JOB.target, press: PRESS}) + ')');
+    if (JOB.screenshot && !/blk_[a-f0-9]{32}/i.test(snapshot.pageText)) await page.screenshot({path: SHOT, fullPage: true, animations: 'disabled', caret: 'hide', scale: 'css'});
     const presses = [];
     for (const {index, path} of snapshot.pressIndexes) {
       const el = page.locator(PRESS).nth(index);

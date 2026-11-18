@@ -9,6 +9,7 @@ import {CANCELLED_STEP_LIMIT, OUTPUT_LIMIT} from './errors';
 import type {AgentChunk} from './run';
 import {runTurn, tempProject, textStep, toolStep} from './test-project';
 import type {AgentMessage} from './types';
+import {registerSecret} from './trace';
 
 const usage = {
   inputTokens: {total: 3, noCache: 3, cacheRead: undefined, cacheWrite: undefined},
@@ -41,6 +42,19 @@ test('streams the model reply with the configured limits', async () => {
   expect(call.providerOptions).toEqual({openai: {store: false}, anthropic: {fallbacks: 'default', effort: 'medium', thinking: {type: 'adaptive', display: 'summarized'}}});
   expect(call.temperature).toBeUndefined();
   expect(call.toolChoice).toEqual({type: 'auto'});
+});
+
+test('registered secrets in tool results never enter a later model request', async () => {
+  const secret = crypto.randomUUID();
+  registerSecret(secret);
+  const t = tempProject({'notes/data.txt': secret});
+  const model = new MockLanguageModelV4({doStream: [toolStep([['read', 'read_file', {path: 'notes/data.txt'}]]), textStep('Read.')]});
+  try {
+    await runTurn({model, project: t.project, messages: [{role: 'user', content: 'Read the project notes.'}]});
+    expect(model.doStreamCalls.map(call => JSON.stringify(call.prompt).includes(secret))).toEqual([false, false]);
+  } finally {
+    t.cleanup();
+  }
 });
 
 test('stops streaming when aborted', async () => {

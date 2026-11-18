@@ -382,7 +382,7 @@ describe('score records', () => {
     const meta = {task_id: 'copy-edit', run_id: 'r1', model_id: 'claude-haiku-5-5', config_hash: 'abc', evidence_ref: 'runs/copy-edit/run-1', timestamp: '2026-11-18T00:00:00Z'};
     const records = scoreRecords([scoreE4(page()), result('E1', 'E1', 'NOT_EVALUATED', 'No page.'), scoreE8(null)], meta);
     expect(records.map(r => r.name)).toEqual(['E4', 'E4a', 'E4b', 'E4c', 'E4d', 'E4e', 'E4f', 'E4g', 'E4h', 'E4i', 'E4j', 'E4k', 'E1', 'E8']);
-    expect(records[0]).toMatchObject({value: 1, metadata: {...meta, eval_id: 'E4', check: 'E4', evaluator_version: 'evals-v1.0.0', outcome: 'PASS'}});
+    expect(records[0]).toMatchObject({value: 1, metadata: {...meta, eval_id: 'E4', check: 'E4', evaluator_version: 'evals-v1.0.1', outcome: 'PASS'}});
     expect(records.at(-2)).toMatchObject({value: null, outcome: 'NOT_EVALUATED', comment: 'No page.'});
     expect(records.at(-1)).toMatchObject({value: null, outcome: 'NOT_APPLICABLE'});
   });
