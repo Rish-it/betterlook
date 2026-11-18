@@ -13,7 +13,9 @@ export const REFUSED = 'The model declined this request. Rephrase it or pick ano
 // Every cancelled tool call's errorText starts with "Cancelled: ", which is how it is told apart from a tool error.
 export const CANCELLED_STOPPED = 'Cancelled: the turn was stopped before this call finished.';
 export const CANCELLED_ERROR = 'Cancelled: the turn ended with an error before this call finished.';
+export const CANCELLED_STEP_LIMIT = 'Cancelled: the agent hit its step limit before this call ran.';
 export const CANCELLED_ENDED = 'Cancelled: the model ended its turn before this call ran.';
+export const OUTPUT_LIMIT = 'Output limit reached before this call ran. Continue with one file per step, or use edit_file for targeted edits instead of rewriting whole files.';
 export const SANDBOX_FAILED = 'The preview sandbox stopped responding. Reload to try again.';
 export const SANDBOX_QUOTA = 'The preview sandbox has used its free monthly quota, so new sandboxes are paused until it resets.';
 

@@ -15,7 +15,7 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {CANCELLED_ENDED, CANCELLED_ERROR, CANCELLED_STOPPED, errorStatus, NO_CHANGES, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED, WRITE_FAILED} from './errors';
+import {CANCELLED_ENDED, CANCELLED_ERROR, CANCELLED_STEP_LIMIT, CANCELLED_STOPPED, errorStatus, NO_CHANGES, OUTPUT_LIMIT, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED, WRITE_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
@@ -72,6 +72,18 @@ export const repairMessage = (verify: VerifyResult) =>
       .map(c => `${c.name}:\n${c.errors.join('\n')}`)
       .join('\n\n'),
   );
+
+function withOutputLimitErrors(step: ModelMessage[], calls: {toolCallId: string; toolName: string}[]): ModelMessage[] {
+  const ids = new Set(calls.map(c => c.toolCallId));
+  const assistant = step.find(m => m.role === 'assistant');
+  const parts = typeof assistant?.content === 'string' ? [{type: 'text' as const, text: assistant.content}] : (assistant?.content ?? []);
+  const called = new Set(parts.flatMap(p => (p.type === 'tool-call' ? [p.toolCallId] : [])));
+  const results = step.flatMap(m => (m.role === 'tool' ? m.content.filter(p => !(p.type === 'tool-result' && ids.has(p.toolCallId))) : []));
+  return [
+    {...assistant, role: 'assistant', content: [...parts, ...calls.filter(c => !called.has(c.toolCallId)).map(({toolCallId, toolName}) => ({type: 'tool-call' as const, toolCallId, toolName, input: {}}))]},
+    {role: 'tool', content: [...results, ...calls.map(({toolCallId, toolName}) => ({type: 'tool-result' as const, toolCallId, toolName, output: {type: 'error-text' as const, value: OUTPUT_LIMIT}}))]},
+  ];
+}
 
 async function approvalDiff(project: Project, tool: string, input: {path: string; oldString?: string; newString?: string; content?: string}, path: string) {
   if (tool !== 'write_file') return proposedDiff(path, input.oldString ?? '', input.newString ?? '');
@@ -167,7 +179,7 @@ export function runAgent({
             model,
             instructions: SYSTEM_PROMPT || undefined,
             messages: callMessages,
-            stopWhen: isStepCount(AGENT_CONFIG.maxSteps),
+            stopWhen: isStepCount(Math.max(1, AGENT_CONFIG.maxSteps - record.steps.length)),
             maxOutputTokens: AGENT_CONFIG.maxOutputTokens,
             // Claude Sonnet 5.5 400s on non-default sampling, forced toolChoice and disabled thinking, so none are set.
             providerOptions: {
@@ -213,14 +225,11 @@ export function runAgent({
 
       const settled = (outcome: Outcome) => {
         if (outcome.type === 'end') {
-          addUsage(record.usage, outcome.event.totalUsage);
-          record.steps.push(...outcome.event.steps.map(s => ({finishReason: s.finishReason, outputTokens: s.usage.outputTokens ?? 0})));
-          record.lengthStops = record.steps.filter(s => s.finishReason === 'length').length;
           if (outcome.event.finishReason === 'content-filter') {
             end({status: 'error', error: REFUSED});
             return false;
           }
-          if (outcome.event.steps.length >= AGENT_CONFIG.maxSteps && outcome.event.finishReason === 'tool-calls') record.stepLimitReached = true;
+          if (record.steps.length >= AGENT_CONFIG.maxSteps && outcome.event.finishReason === 'tool-calls') record.stepLimitReached = true;
           return true;
         }
         end(outcome.type === 'stopped' ? {status: 'stopped'} : {status: 'error', error: userMessage(outcome.error)});
@@ -236,38 +245,59 @@ export function runAgent({
         else if (chunk.type === 'tool-input-error' || chunk.type === 'tool-output-error' || chunk.type === 'tool-output-denied') open.delete(chunk.toolCallId);
         else if (chunk.type === 'tool-output-available' && !chunk.preliminary) open.delete(chunk.toolCallId);
       };
-      const cancelOpen = (reason: string) => {
-        for (const [toolCallId, call] of open) {
-          if (call.approval) continue;
+      const closeOpen = (errorText: string) => {
+        const closed = [...open].filter(([, call]) => !call.approval);
+        for (const [toolCallId, call] of closed) {
           open.delete(toolCallId);
           writer.write(
             'input' in call
-              ? {type: 'tool-output-error', toolCallId, errorText: reason}
-              : {type: 'tool-input-error', toolCallId, toolName: call.toolName, input: undefined, errorText: reason},
+              ? {type: 'tool-output-error', toolCallId, errorText}
+              : {type: 'tool-input-error', toolCallId, toolName: call.toolName, input: undefined, errorText},
           );
+        }
+        return closed.map(([toolCallId, call]) => ({toolCallId, ...call}));
+      };
+      const cancelOpen = (reason: string) => {
+        for (const {toolCallId, ...call} of closeOpen(reason)) {
           const recorded = record.toolCalls.find(c => c.id === toolCallId);
           if (recorded) Object.assign(recorded, {decision: 'cancelled', result: reason});
           else record.toolCalls.push({id: toolCallId, tool: call.toolName, args: call.input ?? null, result: reason, decision: 'cancelled', startedAt: new Date().toISOString(), durationMs: 0});
         }
       };
 
+      // A call cut off by maxOutputTokens never runs in the SDK, so it goes back to the model as an error and the turn continues.
       const runModel = async (callMessages: ModelMessage[], first: boolean) => {
-        const call = callModel(callMessages);
-        const chunks = toUIMessageStream<ToolSet, AgentMessage>({
-          stream: call.result.stream,
-          sendStart: first,
-          sendFinish: false,
-          onError: userMessage,
-          messageMetadata: ({part}) => (part.type === 'start' ? {turnId: record.id, traceId: record.traceId} : undefined),
-        });
-        for await (const chunk of chunks) {
-          track(chunk);
-          writer.write(chunk);
+        for (let sendStart = first; ; sendStart = false) {
+          const call = callModel(callMessages);
+          const chunks = toUIMessageStream<ToolSet, AgentMessage>({
+            stream: call.result.stream,
+            sendStart,
+            sendFinish: false,
+            onError: userMessage,
+            messageMetadata: ({part}) => (part.type === 'start' ? {turnId: record.id, traceId: record.traceId} : undefined),
+          });
+          for await (const chunk of chunks) {
+            track(chunk);
+            writer.write(chunk);
+          }
+          const outcome = await call.outcome;
+          if (outcome.type !== 'end') return {outcome, messages: callMessages};
+          const {steps} = outcome.event;
+          addUsage(record.usage, outcome.event.totalUsage);
+          record.steps.push(...steps.map(s => ({finishReason: s.finishReason, outputTokens: s.usage.outputTokens ?? 0})));
+          record.lengthStops = record.steps.filter(s => s.finishReason === 'length').length;
+          const last = steps.at(-1)!;
+          const invalid = last.content.flatMap(p => (p.type === 'tool-call' && p.invalid ? [{toolCallId: p.toolCallId, toolName: p.toolName}] : []));
+          const cut = outcome.event.finishReason === 'length' && (invalid.length > 0 || [...open.values()].some(c => !c.approval));
+          if (!cut || record.steps.length >= AGENT_CONFIG.maxSteps) {
+            if (cut) record.stepLimitReached = true;
+            cancelOpen(cut ? CANCELLED_STEP_LIMIT : CANCELLED_ENDED);
+            return {outcome, messages: [...callMessages, ...steps.flatMap(s => s.response.messages)]};
+          }
+          const cutResults = withOutputLimitErrors(last.response.messages, [...closeOpen(OUTPUT_LIMIT), ...invalid]);
+          callMessages = [...callMessages, ...steps.slice(0, -1).flatMap(s => s.response.messages), ...cutResults];
+          if (last.content.some(p => p.type === 'tool-approval-request' && !p.isAutomatic)) return {outcome, messages: callMessages};
         }
-        const outcome = await call.outcome;
-        if (outcome.type !== 'end') return {outcome, messages: callMessages};
-        cancelOpen(CANCELLED_ENDED);
-        return {outcome, messages: [...callMessages, ...(await call.result.response).messages]};
       };
 
       try {

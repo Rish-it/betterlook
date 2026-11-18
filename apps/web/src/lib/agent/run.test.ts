@@ -5,6 +5,7 @@ import {MockLanguageModelV4} from 'ai/test';
 import {AGENT_CONFIG} from './config';
 import {languageModel, parseCredential} from './model';
 import {MODELS, providerOf} from './models';
+import {CANCELLED_STEP_LIMIT, OUTPUT_LIMIT} from './errors';
 import type {AgentChunk} from './run';
 import {runTurn, tempProject, textStep, toolStep} from './test-project';
 import type {AgentMessage} from './types';
@@ -202,6 +203,65 @@ test('calls the model ended without running are cancelled before the turn checkp
       ['w1', 'allowed'],
       ['w2', 'cancelled'],
     ]);
+    expect(unresolvedParts(message)).toEqual([]);
+  } finally {
+    t.cleanup();
+  }
+});
+
+const cutUsage = {...usage, outputTokens: {total: 32_000, text: 32_000, reasoning: undefined}};
+const lengthStep = (third: 'input-cut' | 'invalid-call') => ({
+  stream: simulateReadableStream({
+    chunks: [
+      {type: 'tool-call' as const, toolCallId: 'w1', toolName: 'write_file', input: JSON.stringify({path: 'index.html', content: '<html></html>'})},
+      {type: 'tool-call' as const, toolCallId: 'w2', toolName: 'write_file', input: JSON.stringify({path: 'src/App.tsx', content: '<h1>Big</h1>\n'})},
+      {type: 'tool-input-start' as const, id: 'w3', toolName: 'write_file'},
+      {type: 'tool-input-delta' as const, id: 'w3', delta: '{"path":"src/index.css","content":"body {'},
+      ...(third === 'invalid-call' ? [{type: 'tool-input-end' as const, id: 'w3'}, {type: 'tool-call' as const, toolCallId: 'w3', toolName: 'write_file', input: '{"path":"src/index.css","content":"body {'}] : []),
+      {type: 'finish' as const, finishReason: {unified: 'length' as const, raw: 'max_tokens'}, logprobs: undefined, usage: cutUsage},
+    ],
+  }),
+});
+
+for (const third of ['input-cut', 'invalid-call'] as const) {
+  test(`a step cut off by the output limit returns an error for each call and the turn continues (${third})`, async () => {
+    const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'}, cmd => (cmd === 'node' ? {exitCode: 0, output: '[]'} : {exitCode: 0, output: ''}));
+    const model = new MockLanguageModelV4({
+      doStream: [lengthStep(third), toolStep([['e1', 'edit_file', {path: 'src/App.tsx', oldString: 'Hi', newString: 'Big'}]]), textStep('Done.')],
+    });
+    try {
+      const {chunks, message, record} = await runTurn({model, messages: [{role: 'user', content: 'Design a landing page'}], project: t.project});
+      expect(cancelled(chunks, 'w1')?.errorText).toBe(OUTPUT_LIMIT);
+      expect(cancelled(chunks, 'w2')?.errorText).toBe(OUTPUT_LIMIT);
+      expect(cancelled(chunks, 'w3')).toBeDefined();
+      expect(unresolvedParts(message)).toEqual([]);
+
+      expect(model.doStreamCalls.length).toBe(3);
+      const continued = JSON.stringify(model.doStreamCalls[1].prompt);
+      for (const id of ['w1', 'w2', 'w3']) expect(continued).toContain(`"toolCallId":"${id}"`);
+      expect(continued.split(OUTPUT_LIMIT).length - 1).toBe(3);
+      expect(continued).not.toContain('JSON parsing failed');
+      for (const call of model.doStreamCalls) expect(call.providerOptions?.anthropic).toMatchObject({effort: 'medium', thinking: {display: 'summarized'}});
+
+      expect(t.file('src/App.tsx')).toBe('<h1>Big</h1>\n');
+      expect(record).toMatchObject({status: 'passed', lengthStops: 1, filesTouched: ['src/App.tsx']});
+      expect(record.steps.map(s => s.finishReason)).toEqual(['length', 'tool-calls', 'stop']);
+    } finally {
+      t.cleanup();
+    }
+  });
+}
+
+test('a length stop on the last allowed step cancels its calls with the step limit as the reason', async () => {
+  const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'});
+  let n = 0;
+  const model = new MockLanguageModelV4({doStream: async () => (++n < AGENT_CONFIG.maxSteps ? toolStep([[`l${n}`, 'list_files', {}]]) : lengthStep('input-cut'))});
+  try {
+    const {chunks, message, record} = await runTurn({model, messages: [{role: 'user', content: 'Design a landing page'}], project: t.project});
+    expect(model.doStreamCalls.length).toBe(AGENT_CONFIG.maxSteps);
+    for (const id of ['w1', 'w2', 'w3']) expect(cancelled(chunks, id)?.errorText).toBe(CANCELLED_STEP_LIMIT);
+    expect(record.toolCalls.filter(c => c.decision === 'cancelled').map(c => c.id)).toEqual(['w1', 'w2', 'w3']);
+    expect(record).toMatchObject({stepLimitReached: true, lengthStops: 1, status: 'no-changes'});
     expect(unresolvedParts(message)).toEqual([]);
   } finally {
     t.cleanup();
