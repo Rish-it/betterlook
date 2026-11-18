@@ -15,13 +15,13 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, NO_CHANGES, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED} from './errors';
+import {errorStatus, NO_CHANGES, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED, WRITE_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
 import {createTools, proposedDiff, TOOL_DEFINITIONS} from './tools';
 import {hashOf, TRACER_NAME} from './trace';
-import type {AgentMessage, DeniedCall, ToolName, TurnRecord, Usage, VerifyResult} from './types';
+import type {AgentMessage, DeniedCall, ToolCallRecord, ToolName, TurnRecord, Usage, VerifyResult} from './types';
 import {verifyProject} from './verify';
 
 export type AgentChunk = InferUIMessageChunk<AgentMessage>;
@@ -39,7 +39,7 @@ const addUsage = (total: Usage, u: LanguageModelUsage) => {
 
 export function noticeFor(record: TurnRecord): string | undefined {
   if (record.status === 'error') return record.error;
-  if (record.status === 'failed') return VERIFY_FAILED;
+  if (record.status === 'failed') return (record.repairVerify ?? record.verify)?.ok === false ? VERIFY_FAILED : WRITE_FAILED;
   if (record.status === 'unverified') return UNVERIFIED;
   if (record.stepLimitReached && record.status !== 'stopped') return STEP_LIMIT;
   if (record.status === 'no-changes') return NO_CHANGES;
@@ -51,8 +51,18 @@ const lastUserText = (messages: ModelMessage[]) => {
   return typeof content === 'string' ? content : (content ?? []).map(p => (p.type === 'text' ? p.text : '')).join('');
 };
 
-// A skipped check is never a pass: the turn is only 'passed' when every check ran and passed.
-const checkedStatus = (verify: VerifyResult) => (verify.checks.every(c => c.status === 'passed') ? 'passed' : 'unverified');
+// A write failed when the last write that ran on its path ended in error; a later successful write to the path fixes it.
+function writeFailed(toolCalls: ToolCallRecord[]) {
+  const last = new Map<string, unknown>();
+  for (const c of toolCalls) {
+    if ((c.tool === 'write_file' || c.tool === 'edit_file') && (c.decision === 'allowed' || c.decision === 'approved')) last.set((c.args as {path: string}).path, c.result);
+  }
+  return [...last.values()].some(result => (result as {error?: string} | null)?.error !== undefined);
+}
+
+// A skipped check is never a pass: the turn is only 'passed' when every check ran and passed and no write failed.
+const checkedStatus = (verify: VerifyResult, toolCalls: ToolCallRecord[]) =>
+  writeFailed(toolCalls) ? 'failed' : verify.checks.every(c => c.status === 'passed') ? 'passed' : 'unverified';
 
 export const repairMessage = (verify: VerifyResult) =>
   REPAIR_PROMPT.replace(
@@ -243,7 +253,7 @@ export function runAgent({
         writer.write({type: 'data-diff', id: 'diff', data: saved.diff});
         const verify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'verify', data: verify});
-        if (verify.ok) return end({status: checkedStatus(verify), verify, checkpoint: saved.checkpoint, ...saved.diff});
+        if (verify.ok) return end({status: checkedStatus(verify, record.toolCalls), verify, checkpoint: saved.checkpoint, ...saved.diff});
 
         const repair = callModel([...messages, ...(await first.result.response).messages, {role: 'user', content: repairMessage(verify)}]);
         await pipe(toUIMessageStream<ToolSet, AgentMessage>({stream: repair.result.stream, sendStart: false, sendFinish: false, onError: userMessage}));
@@ -255,7 +265,7 @@ export function runAgent({
         const repairVerify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'repair-verify', data: repairVerify});
         end({
-          status: repairVerify.ok ? checkedStatus(repairVerify) : 'failed',
+          status: repairVerify.ok ? checkedStatus(repairVerify, record.toolCalls) : 'failed',
           verify,
           repairAttempted: true,
           repairVerify,

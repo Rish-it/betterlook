@@ -6,6 +6,7 @@ export const RATE_LIMITED = 'The model provider is rate limiting requests. Wait 
 export const PROVIDER_FAILED = 'The model provider returned an error. Try again.';
 export const VERIFY_FAILED = 'The change still fails its checks after one repair attempt. Restore the previous version or describe what to fix.';
 export const UNVERIFIED = 'The change builds, but the visual check could not run, so it is not verified. Check the preview yourself.';
+export const WRITE_FAILED = 'Some file edits failed, so the change is incomplete. Check the preview or describe what to fix.';
 export const NO_CHANGES = 'No changes made.';
 export const STEP_LIMIT = 'The agent hit its step limit before finishing. Send another message to let it continue.';
 export const REFUSED = 'The model declined this request. Rephrase it or pick another model.';
