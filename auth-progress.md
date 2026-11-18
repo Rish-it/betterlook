@@ -35,6 +35,12 @@ Branch `auth`. Dev server port `3600`.
 - The integrated Workspace on port 3600 sends only the Anthropic key with Claude Sonnet 5.5 and only the OpenAI key with GPT-5 to the mocked `/api/chat` endpoint. The route tests cover rejecting an OpenAI key for Claude and the `Sign in or add an OpenAI API key to use GPT-5.` response. No live provider key is used.
 - Inspected `.screenshots/auth-a09-{light,dark}-{1120,400}.png` and `.screenshots/auth-a09-{light,dark}-400-connected.png` after C11. With Claude Sonnet 5.5 selected at 400 px, the title wraps to two lines and the popover fits without horizontal overflow, including with both providers connected.
 
+## A10 — Key order
+
+- [x] Connect models lists Anthropic first for the default Claude Sonnet 5.5 model. The OpenAI group contains its API key field and ChatGPT sign-in, including the signed-in account and sign-out control.
+- The Workspace browser check first reproduced the old field order. It passes after the change and confirms visual order, keyboard order, focus restoration, ChatGPT grouping with mocked sessions, and no horizontal overflow. Inspected `.screenshots/auth-a10-{light,dark}-{1120,400}.png`.
+- Two separate root runs of `bun run typecheck --incremental false` and `bun run test` passed with 71 tests and zero failures per run. `npx react-doctor@latest . --scope changed` scored 100/100. The full scan reports the same five pre-existing warnings outside AUTH.
+
 ## Founder decision
 
 Build browser-held per-request API keys and official Sign in with ChatGPT for OpenAI. Claude, Gemini, and Grok sign-in are outside this loop. ChatGPT uses a provisional encrypted HTTP-only browser-session cookie behind one storage module, pending OpenAI's approval of hosted custody. Mock provider endpoints for automated checks while registration is pending. Put each deferred check under its item as `LIVE PROOF PENDING ENV: <exact check>` and maintain the list below.
