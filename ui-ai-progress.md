@@ -157,9 +157,9 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - Two jumps found and fixed on the way: an inline element sat on the same line as the next one, and a body-line-height strut added 4px. Building on `Text` matches the metrics.
   - Screenshots, checked by eye: `.screenshots/ai-09-thinking-toolbar-light.png` and `.screenshots/ai-09-thinking-toolbar-dark.png` (thinking alone, the swap demo, and the toolbar loading, ready and error).
   - `bun run typecheck`: exit 0 on two clean runs; `bun test`: 4 pass. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
-- [ ] Wire-up: only once the AI loop has that data, swap mocks for live data in the chat panel and connect approve/deny/restore callbacks; list anything still on mocks.
+- [x] Wire-up: only once the AI loop has that data, swap mocks for live data in the chat panel and connect approve/deny/restore callbacks; list anything still on mocks.
 
-  Partly done; waiting for AI-CORE's checkpoint/verify item. Merged `betterlook` at b9fd648d (`AgentDataParts`, `AgentMessage`, `createAgentChat`) and 18533f49 (AUTH).
+  Done. Merged `betterlook` at 6ddd06db (checkpoint, verify, repair-verify, `restoreCheckpoint`, `keepTurn`) after the earlier merges. Earlier merges: `betterlook` at b9fd648d (`AgentDataParts`, `AgentMessage`, `createAgentChat`) and 18533f49 (AUTH).
   - Chat panel (`workspace/Workspace.tsx`): the chat is `createAgentChat({getCredential, getSandboxId})`, using `getCredential` from `@/lib/auth/client`; the local stub is gone.
     - It renders `Conversation`, so live messages go through `Message`.
     - `Thinking` shows while `status === 'submitted'`.
@@ -188,9 +188,24 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
     - `bun run typecheck`: exit 0 on two clean runs
     - `bun test` (whole app): 49 pass on both runs
     - `react-doctor`: two index-key warnings (text and reasoning parts, already judged false positives) and `Workspace.tsx:166` data fetching in an effect (AI-CORE's sandbox request, kept as asked)
+  - Checkpoint, verify and restore (6ddd06db):
+    - `Message` shows only the latest `data-verify` part, so `repair-verify` replaces `verify` and is never shown twice.
+    - The `data-checkpoint` and `data-diff` parts replace each other by id in the AI SDK.
+    - The checkpoint marker renders last in the message, as the marker between turns.
+    - Restore → confirm calls `restoreCheckpoint({sandboxId, checkpointId: checkpoint.id, turnId, traceId})`, with `traceId` from the assistant message metadata. It then reloads the preview and shows "Restored…" (or the server's readable error) in the chat.
+    - Restoring `checkpoint.id` returns the app to how it was after that turn and undoes later turns, as the confirm dialog says. There is no "undo this turn" (`parentId`) control; see the handoff.
+  - Checked live:
+    - Playwright streamed a turn ending in checkpoint, diff, failed verify (build failed, runtime skipped), then the repaired checkpoint, diff and passed `repair-verify`. The chat showed exactly one verify ("Checks passed"), one diff and one marker.
+    - Restore → confirm POSTed `/api/restore` with `{sandboxId: 'sbx1', checkpointId: 'cp_repaired', turnId: 'turn_1', traceId: 'trace_1'}`. The preview iframe reloaded and the notice showed; no console errors.
+    - Screenshots: `.screenshots/ai-10-restore-{light,dark}-turn-end.png` and `-restored.png`.
+  - Review (`ponytail-review`): removed the unused `Thinking` label prop and two unused type exports.
+  - Final checks:
+    - `bun run typecheck`: exit 0 on two clean runs
+    - `bun test`: 55 pass on both runs
+    - `react-doctor`: two index-key warnings (judged false positives), `Workspace.tsx:167` (AI-CORE's sandbox effect, kept as asked), and `lib/agent/verify.ts:29` (AI-CORE's file)
   - Still not live:
-    - Restore: `Workspace` passes no `onEvent`, so `Checkpoint` doesn't render in the live chat. It needs AI-CORE's restore action.
-    - Verify, checkpoint and diff parts: rendering is wired, but AI-CORE's stream doesn't emit them yet. Until it does, the dev page shows them from fixtures.
+    - Keep: `keepTurn` exists but nothing calls it. When a turn counts as "kept" (an explicit control, or implied by the next prompt) is a product and eval decision for the founder.
+    - Real chat turns are proven against a Playwright-stubbed stream, not a live provider. I have no key and don't type credentials.
     - Attachments: `Composer` passes files to `onSubmit`, but `Workspace.send` drops them; the agent takes no files.
     - The first request after a new prompt goes out with `sandboxId: null`, because the sandbox request is still pending. That is pre-existing timing in the sandbox flow.
     - `AuthControls` hard-codes `#000`/`#202020` on its ChatGPT button (AUTH's file); flagged for AUTH, not changed.

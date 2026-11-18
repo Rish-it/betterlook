@@ -203,6 +203,7 @@ export const verifyResults: Record<'passed' | 'typecheckFailed' | 'buildFailed' 
 
 export const checkpoint: Checkpoint = {
   id: 'cp_8f3a2c1',
+  parentId: 'cp_77b01d9',
   sandboxId: 'sbx_demo',
   turnId: 'turn_01',
   createdAt: '2026-11-18T10:01:58.000Z',
@@ -227,9 +228,10 @@ export const liveTurn: AgentMessage[] = [
       {type: 'tool-edit_file', toolCallId: 'call_edit_live', state: 'output-available', input: editInput, output: {ok: true}},
       {type: 'tool-write_file', toolCallId: 'call_pkg', state: 'approval-requested', input: {path: 'package.json'}, approval: {id: 'appr_pkg'}},
       {type: 'data-approval', id: 'call_pkg', data: approval},
-      {type: 'data-diff', id: 'diff_turn_03', data: {diff: turnDiff, filesTouched: turnFiles}},
-      {type: 'data-verify', id: 'verify_turn_03', data: verifyResults.buildFailed},
-      {type: 'data-checkpoint', id: 'cp_turn_03', data: checkpoint},
+      {type: 'data-diff', id: 'diff', data: {diff: turnDiff, filesTouched: turnFiles}},
+      {type: 'data-verify', id: 'verify', data: verifyResults.buildFailed},
+      {type: 'data-verify', id: 'repair-verify', data: verifyResults.passed},
+      {type: 'data-checkpoint', id: 'checkpoint', data: checkpoint},
       {type: 'text', state: 'done', text: 'The heading is blue. Adding clsx needs your approval.'},
     ],
   },

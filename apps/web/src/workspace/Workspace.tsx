@@ -18,7 +18,8 @@ import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/token
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/lib/agent/models';
-import {createAgentChat} from '@/lib/agent/client';
+import {createAgentChat, restoreCheckpoint} from '@/lib/agent/client';
+import type {TurnEvent} from '@/lib/agent/types';
 import {getCredential} from '@/lib/auth/client';
 import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
@@ -185,6 +186,20 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     setFrameKey(k => k + 1);
   };
 
+  const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
+  const onTurnEvent = async (event: TurnEvent) => {
+    const sandboxId = readStored(SANDBOX_KEY);
+    if (event.type !== 'restore' || !sandboxId) return;
+    const traceId = messages.find(m => m.metadata?.turnId === event.turnId)?.metadata?.traceId;
+    try {
+      await restoreCheckpoint({sandboxId, checkpointId: event.checkpointId, turnId: event.turnId, traceId});
+      setRestoreNotice('Restored. The preview shows the app as it was at that checkpoint.');
+      refresh();
+    } catch (e) {
+      setRestoreNotice(e instanceof Error && e.message ? e.message : 'That checkpoint could not be restored.');
+    }
+  };
+
   return (
     <AppShell
       height="fill"
@@ -217,6 +232,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
               messages={messages}
               isStreaming={isBusy}
               onApproval={(id, approved) => chat.addToolApprovalResponse({id, approved})}
+              onEvent={onTurnEvent}
               composer={
                 <Composer
                   placeholder="Describe a change"
@@ -230,6 +246,11 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
               {status === 'submitted' && (
                 <ChatMessage sender="assistant">
                   <Thinking />
+                </ChatMessage>
+              )}
+              {restoreNotice && (
+                <ChatMessage sender="assistant">
+                  <ChatMessageBubble variant="ghost">{restoreNotice}</ChatMessageBubble>
                 </ChatMessage>
               )}
               {error && (

@@ -62,6 +62,10 @@ export function Message({message, onApproval, onEvent}: MessageProps) {
 
   const denied = new Map(message.parts.flatMap(p => (p.type === 'data-denied' ? [[p.data.toolCallId, p.data] as const] : [])));
   const approvals = new Map(message.parts.flatMap(p => (p.type === 'data-approval' ? [[p.data.toolCallId, p.data] as const] : [])));
+  // A repair run sends a second verify part; only the latest one is current.
+  const lastVerify = message.parts.findLastIndex(p => p.type === 'data-verify');
+  // The marker sits between turns, so it renders after everything else in the message.
+  const checkpoint = message.parts.findLast(p => p.type === 'data-checkpoint')?.data;
   const toolIds = new Set(message.parts.flatMap(p => (isToolPart(p) ? [p.toolCallId] : [])));
   const label = MODELS.find(m => m.id === message.metadata?.model)?.label;
 
@@ -102,12 +106,12 @@ export function Message({message, onApproval, onEvent}: MessageProps) {
         }
         if (part.type === 'data-denied' && !toolIds.has(part.data.toolCallId))
           return <DeniedCall key={`denied-${part.data.toolCallId}`} call={part.data} />;
-        if (part.type === 'data-verify') return <VerifyResult key={part.id ?? 'verify'} result={part.data} />;
+        if (part.type === 'data-verify')
+          return i === lastVerify ? <VerifyResult key={part.id ?? 'verify'} result={part.data} /> : null;
         if (part.type === 'data-diff') return <DiffView key={part.id ?? 'diff'} diff={part.data.diff} />;
-        if (part.type === 'data-checkpoint' && onEvent)
-          return <Checkpoint key={part.data.id} checkpoint={part.data} onEvent={onEvent} />;
         return null;
       })}
+      {checkpoint && onEvent && <Checkpoint checkpoint={checkpoint} onEvent={onEvent} />}
     </ChatMessage>
   );
 }

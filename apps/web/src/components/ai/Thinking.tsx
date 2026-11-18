@@ -22,11 +22,11 @@ const styles = stylex.create({
 });
 
 // Same Text metrics as a supporting line, so swapping it for the reply never moves the layout.
-export function Thinking({label = 'Thinking'}: {label?: string}) {
+export function Thinking() {
   return (
     <div role="status">
       <Text type="supporting" display="block" xstyle={styles.shimmer}>
-        {label}
+        Thinking
       </Text>
     </div>
   );

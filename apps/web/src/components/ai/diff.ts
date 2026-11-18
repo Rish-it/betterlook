@@ -1,11 +1,9 @@
-export type FileDiff = {path: string; additions: number; deletions: number; patch: string};
-
 export const hunks = (patch: string) => {
   const lines = patch.split('\n');
   return lines.slice(Math.max(0, lines.findIndex(l => l.startsWith('@@')))).join('\n').trimEnd();
 };
 
-export function parseDiff(diff: string): FileDiff[] {
+export function parseDiff(diff: string) {
   return diff
     .split(/^(?=diff --git )/m)
     .filter(chunk => chunk.startsWith('diff --git '))

@@ -6,8 +6,6 @@ import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Text} from '@astryxdesign/core/Text';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
 
-export type PreviewStatus = 'loading' | 'ready' | 'error';
-
 const DOT = {
   loading: {variant: 'neutral', label: 'Preview loading', isPulsing: true},
   ready: {variant: 'success', label: 'Preview ready', isPulsing: false},
@@ -23,7 +21,7 @@ function RefreshGlyph(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-type PreviewToolbarProps = {url: string; status: PreviewStatus; message?: string; onRefresh(): void};
+type PreviewToolbarProps = {url: string; status: 'loading' | 'ready' | 'error'; message?: string; onRefresh(): void};
 
 export function PreviewToolbar({url, status, message = 'Preview', onRefresh}: PreviewToolbarProps) {
   const dot = DOT[status];
