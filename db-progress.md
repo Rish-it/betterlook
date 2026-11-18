@@ -133,3 +133,23 @@ messages | REST HTTP 200 | []
 projects | REST HTTP 200 | []
 users | REST HTTP 200 | []
 ```
+
+### Cloud verification with sentinel rows (DB-2b)
+
+Two independent runs used fresh sentinel IDs. The Supabase Admin API created a throwaway `auth.users` row for each run. The server connection committed one transaction inserting a linked row in each product table. Each publishable-key REST request filtered for its exact sentinel, and the server checked that every row was visible both before and after the REST requests. The `anon` role had `SELECT` grants on all four tables. Each run deleted the product rows in one transaction, deleted the throwaway Auth user through the Admin API, and confirmed that all five sentinel records were gone.
+
+Both runs returned this output.
+
+```text
+anon has SELECT grants on all four tables.
+Admin user creation | HTTP 200 | auth.users match=1
+Sentinel insert | committed one transaction
+users | server count=1 | publishable REST HTTP 200 | []
+projects | server count=1 | publishable REST HTTP 200 | []
+conversations | server count=1 | publishable REST HTTP 200 | []
+messages | server count=1 | publishable REST HTTP 200 | []
+Server still sees one sentinel per table after all REST requests.
+Sentinel delete | committed one transaction
+Admin user delete | HTTP 200
+Cleanup verified | users=0 | projects=0 | conversations=0 | messages=0 | auth.users=0
+```
