@@ -23,7 +23,9 @@ export const sandboxConfigured = () => Boolean(tokenTriple()) || process.env.BET
 const credentials = () => tokenTriple() ?? {};
 
 async function run(sandbox: Sandbox, cmd: string, args: string[], opts: {sudo?: boolean; env?: Record<string, string>} = {}) {
-  const result = await sandbox.runCommand({cmd, args, ...opts});
+  const result = await sandbox.runCommand({cmd, args, ...opts}).catch(cause => {
+    throw new Error(`Sandbox ${sandbox.name}: ${cmd} ${args[0]} failed (${cause instanceof Error ? cause.name : 'unknown error'}).`, {cause});
+  });
   if (result.exitCode === 0) return;
   const failed = `${cmd} ${args[0]} failed (exit ${result.exitCode})`;
   console.error(`[sandbox] ${failed}:`, (await result.output('stderr').catch(() => '')).slice(-2_000));
@@ -88,7 +90,12 @@ async function buildBase(api: SandboxApi) {
   const {snapshots} = await api.Snapshot.list({name: BASE_NAME, sortOrder: 'desc', ...credentials()});
   const ready = snapshots.find(s => s.status === 'created');
   if (ready) return ready.id;
-  const sandbox = await api.Sandbox.getOrCreate({name: BASE_NAME, runtime: 'node24', persistent: false, resume: true, ...resources, ...credentials()});
+  const sandbox = await api.Sandbox.getOrCreate({name: BASE_NAME, runtime: 'node24', persistent: false, resume: true, ...resources, ...credentials()}).catch(cause => {
+    if (cause instanceof Error && cause.message.includes('Cannot resume sandbox: no snapshot available')) {
+      throw new Error(`Starter base ${BASE_NAME} has no usable snapshot and cannot resume. Reset this base before retrying.`, {cause});
+    }
+    throw cause;
+  });
   return stopOnFailure(sandbox, async () => {
     const checker = await installStarter(sandbox);
     // A base without the checker expires in a day, so a later sandbox retries the install.

@@ -20,7 +20,7 @@ const STARTER_SETUP = [
   'npx --prefix /tmp/betterlook playwright install chromium',
 ];
 
-function fakeApi({failOn, throwOn, snapshots = [], expiresInMs = SANDBOX_CONFIG.timeoutMs}: {failOn?: string; throwOn?: string; snapshots?: {id: string; status: string}[]; expiresInMs?: number} = {}) {
+function fakeApi({failOn, throwOn, throwError = new Error('sandbox unreachable'), snapshots = [], expiresInMs = SANDBOX_CONFIG.timeoutMs}: {failOn?: string; throwOn?: string; throwError?: Error; snapshots?: {id: string; status: string}[]; expiresInMs?: number} = {}) {
   const calls: string[] = [];
   const sandbox = {
     name: 'sbx-test',
@@ -35,7 +35,7 @@ function fakeApi({failOn, throwOn, snapshots = [], expiresInMs = SANDBOX_CONFIG.
           ? `${cmdOrParams} ${args.join(' ')}`
           : `${cmdOrParams.sudo ? 'sudo ' : ''}${cmdOrParams.cmd} ${cmdOrParams.args.join(' ')}${cmdOrParams.detached ? ' &' : ''}`;
       calls.push(line);
-      if (throwOn && line.startsWith(throwOn)) throw new Error('sandbox unreachable');
+      if (throwOn && line.startsWith(throwOn)) throw throwError;
       return {exitCode: failOn && line.startsWith(failOn) ? 1 : 0, output: async () => 'stderr tail'};
     },
     snapshot: async (opts: unknown) => (calls.push(`snapshot ${JSON.stringify(opts)}`), {snapshotId: 'snap-base'}),
@@ -106,6 +106,36 @@ test('a failed setup command stops the base sandbox, logs the stderr tail, and t
   await expect(createSandbox(api)).rejects.toThrow('npm install failed (exit 1)');
   expect(calls[0]).toStartWith('list');
   logged.mockRestore();
+});
+
+test('a setup transport error reports the sandbox and command while preserving its cause', async () => {
+  const cause = new TypeError('transport interrupted');
+  const {api, calls} = fakeApi({throwOn: 'npm install', throwError: cause});
+  const error = await createProject(api).catch(error => error);
+  expect(error.message).toBe('Sandbox sbx-test: npm install failed (TypeError).');
+  expect(error.cause).toBe(cause);
+  expect(calls.at(-1)).toBe('stop');
+  expect(calls.some(c => c.startsWith('snapshot') || c.startsWith('create '))).toBe(false);
+});
+
+test('a stopped base without a snapshot reports the base and permits retry after external recovery', async () => {
+  const {api, calls} = fakeApi();
+  const cause = Object.assign(new Error('Status code 400 is not ok: Cannot resume sandbox: no snapshot available.'), {response: {status: 400}});
+  const getOrCreate = spyOn(api!.Sandbox, 'getOrCreate').mockRejectedValue(cause);
+  const message = `Starter base ${BASE_NAME} has no usable snapshot and cannot resume. Reset this base before retrying.`;
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const error = await createProject(api).catch(error => error);
+      expect(error.message).toBe(message);
+      expect(error.cause).toBe(cause);
+    }
+    expect(calls).toHaveLength(2);
+    expect(calls.every(c => c.startsWith('list '))).toBe(true);
+    getOrCreate.mockRestore();
+    expect((await createProject(api)).id).toBe('sbx-test');
+  } finally {
+    getOrCreate.mockRestore();
+  }
 });
 
 test('a failed runtime checker install still gives a working sandbox, and its base snapshot expires in a day', async () => {
