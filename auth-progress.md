@@ -21,7 +21,9 @@ Branch `auth`. Dev server port `3600`.
 - [x] Hand-off. Two mocked Next.js runs passed an OAuth session through `getServerCredential(request)` and AI-CORE's language-model factory to a stub typed with `runAgent`'s actual input. An explicit API key took precedence, and a request without either credential returned 401. The temporary test route returns booleans and the credential kind, with credentials held server-side.
   - LIVE PROOF PENDING ENV: founder test account + client ID; signed-in request reaches runAgent and gets a reply
   - Also verify the signed-in turn draws from the account's ChatGPT allowance and repeat with a founder-provided API key to confirm API billing.
-- [ ] Failure states. Verify readable messages and API-key fallback for consent denial, expired and revoked tokens, refresh failure, and provider outage.
+- [x] Failure states. Mocked endpoint tests distinguish consent denial, expiry, revocation, refresh failure, and provider outage. Chromium rendered all five messages with the API-key fallback in two runs. Fixed the initial consent-denial message disappearing when opening the panel triggered a second status fetch.
+  - Inspected `.screenshots/auth-consent-denied-dark.png` and `.screenshots/auth-provider-unavailable-dark.png`. Two clean root typechecks and `bun run test` passed (30 pass, 0 fail per run). React Doctor scored 100/100 with the temporary preview removed.
+  - LIVE PROOF PENDING ENV: Deny live consent, then connect and revoke access in ChatGPT settings. Verify rejected model requests and that the next failed refresh surfaces revocation and leaves the API-key fallback available.
 - [ ] Secret hygiene. Verify that logs, screenshots, test output, and traces contain no tokens, client secrets, or `.env` values.
 
 ## Founder decision

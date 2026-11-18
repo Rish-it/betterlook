@@ -122,6 +122,7 @@ export function AuthControls() {
 
   const close = useCallback(() => {
     setOpen(false);
+    setIssue(undefined);
     requestAnimationFrame(() => triggerRef.current?.focus());
   }, []);
 
@@ -140,9 +141,12 @@ export function AuthControls() {
       setStatus(next);
 
       const nextIssue = takeCallbackIssue() ?? next.issue;
-      setIssue(nextIssue);
-      if (nextIssue) setOpen(true);
-      else if (method === 'POST') close();
+      if (nextIssue) {
+        setIssue(nextIssue);
+        setOpen(true);
+      } else if (method === 'POST') {
+        close();
+      }
     } catch {
       if (request.signal.aborted) return;
       setIssue('provider-unavailable');
@@ -184,7 +188,10 @@ export function AuthControls() {
       onOpenChange={next => {
         setOpen(next);
         if (next) void requestStatus();
-        else setDraftKey('');
+        else {
+          setDraftKey('');
+          setIssue(undefined);
+        }
       }}
       content={
         <VStack gap={4}>
