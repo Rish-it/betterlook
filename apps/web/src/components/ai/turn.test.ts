@@ -1,6 +1,6 @@
 import {expect, test} from 'bun:test';
 import type {AgentMessage} from '@/lib/agent/types';
-import {changedFiles, uniqueById, unshownApprovals} from './turn';
+import {changedFiles, hasThought, uniqueById, unshownApprovals} from './turn';
 
 const approvalPart = {
   type: 'tool-write_file',
@@ -34,4 +34,10 @@ test('only a turn whose diff is non-empty changed files', () => {
   expect(changedFiles(assistant([{type: 'data-diff', id: 'diff', data: {diff: 'diff --git a/x b/x', filesTouched: ['x']}}]))).toBe(true);
   expect(changedFiles(assistant([{type: 'data-diff', id: 'diff', data: {diff: '', filesTouched: []}}]))).toBe(false);
   expect(changedFiles(assistant([{type: 'text', text: 'No changes made.'}]))).toBe(false);
+});
+
+test('a reasoning part with no text has nothing to show', () => {
+  expect(hasThought({type: 'reasoning', text: '', state: 'done'})).toBe(false);
+  expect(hasThought({type: 'reasoning', text: ' \n', state: 'streaming'})).toBe(false);
+  expect(hasThought({type: 'reasoning', text: 'Read Hero.tsx first.', state: 'done'})).toBe(true);
 });

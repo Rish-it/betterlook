@@ -1,3 +1,4 @@
+import type {ReasoningUIPart} from 'ai';
 import type {AgentMessage} from '@/lib/agent/types';
 import type {ToolPart} from './ToolCall';
 
@@ -17,3 +18,5 @@ export const uniqueById = (messages: AgentMessage[]) => [...new Map(messages.map
 
 // data-diff is sent only when a turn changed files.
 export const changedFiles = (message: AgentMessage) => message.parts.some(p => p.type === 'data-diff' && p.data.diff !== '');
+
+export const hasThought = (part: ReasoningUIPart) => part.text.trim() !== '';

@@ -12,7 +12,7 @@ import {DeniedCall} from './DeniedCall';
 import {DiffView} from './DiffView';
 import {ToolCall, type ToolPart} from './ToolCall';
 import {VerifyResult} from './VerifyResult';
-import {isToolPart} from './turn';
+import {hasThought, isToolPart} from './turn';
 
 type MessageProps = {
   message: AgentMessage;
@@ -87,7 +87,7 @@ export function Message({message, onApproval, onEvent}: MessageProps) {
               {part.text}
             </Markdown>
           );
-        if (part.type === 'reasoning') return <Reasoning key={part.id ?? `reasoning-${i}`} part={part} />;
+        if (part.type === 'reasoning') return hasThought(part) ? <Reasoning key={part.id ?? `reasoning-${i}`} part={part} /> : null;
         if (isToolPart(part)) {
           const deniedCall = denied.get(part.toolCallId);
           if (deniedCall) return <DeniedCall key={part.toolCallId} call={deniedCall} />;
