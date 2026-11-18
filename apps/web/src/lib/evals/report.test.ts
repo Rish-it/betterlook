@@ -37,7 +37,7 @@ test('pass@1 uses the first trial, pass^k needs every trial; skipped runs count 
   expect(s.per_eval.E1.pass_pow_k).toEqual({n: 0, d: 2, value: 0});
   expect(s.per_eval.E2.pass_pow_k).toEqual({n: 1, d: 2, value: 0.5});
   expect(s.per_eval.E1.trial_counts).toEqual({PASS: 1, FAIL: 2, NOT_EVALUATED: 1, NOT_APPLICABLE: 0});
-  expect(s.per_eval.E8.trial_counts.NOT_APPLICABLE).toBe(3);
+  expect(s.per_eval.E8.trial_counts.NOT_APPLICABLE).toBe(4);
   expect(s.per_eval.E8.pass_at_1).toEqual({n: 0, d: 0, value: null});
   expect([s.executed, s.expected]).toEqual([3, 4]);
   expect(s.cost_per_completed_task_usd).toBeCloseTo(0.15);

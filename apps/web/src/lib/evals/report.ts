@@ -61,6 +61,7 @@ const ratio = (n: number, d: number) => ({n, d, value: d ? n / d : null});
 export function summarize(input: {model: string; tasks: {id: string; applies: EvalId[]}[]; k: number; runs: RunRecord[]; notRun: NotRun[]}) {
   const {tasks, k, runs, notRun} = input;
   const outcome = (taskId: string, trial: number, id: EvalId): {outcome: Outcome; reason: string} => {
+    if (!tasks.find(t => t.id === taskId)?.applies.includes(id)) return {outcome: 'NOT_APPLICABLE', reason: "Not in this task's applies list."};
     const run = runs.find(r => r.task_id === taskId && r.trial_index === trial);
     const res = run?.results.find(x => x.eval === id);
     if (res) return {outcome: res.outcome, reason: res.reason};
