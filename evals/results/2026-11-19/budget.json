@@ -1,0 +1,21 @@
+{
+  "limit_usd": 10,
+  "smoke_usd": 0.0010237,
+  "haiku_usd": 0.0389846,
+  "haiku_cohort_usd": 0.0316215,
+  "haiku_excluded_usd": 0.007363100000000001,
+  "sonnet_usd": 0.6413876,
+  "total_usd": 0.6813959,
+  "remaining_usd": 9.3186041,
+  "projection": {
+    "source": "one copy-edit smoke; dated repo price table",
+    "smoke_usd": 0.0010237,
+    "haiku_60_with_judges_usd": 0.061422,
+    "sonnet_24_with_judges_usd": 0.3713568,
+    "projected_total_with_smoke_usd": 0.4338025,
+    "haiku_command_cap_usd": 0.0737064,
+    "total_limit_usd": 10
+  },
+  "completed_observed_tasks_including_smoke_and_extras": 47,
+  "cost_per_completed_observed_task_usd": 0.01449778510638298
+}

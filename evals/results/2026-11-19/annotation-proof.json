@@ -1,0 +1,8 @@
+{
+  "response_url": "https://us.cloud.langfuse.com/api/public/annotation-queues/cmwmgtsxv0116ad0es4dlapnx/items?limit=100",
+  "added": 20,
+  "selected_pending": 20,
+  "labels_supplied": 0,
+  "notes_supplied": 0,
+  "note_rule": "A note is required in the human score configuration description; public API has no mandatory-comment flag."
+}

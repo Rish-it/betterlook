@@ -1,0 +1,33 @@
+{
+  "protected_nonempty_env_values": 11,
+  "public_env_exception": "LANGFUSE_BASE_URL in service links, explicitly approved by founder",
+  "runtime_canary_trials": 6,
+  "runtime_publication_scans": {
+    "smoke": {
+      "patterns": 10,
+      "leaks": 0
+    },
+    "haiku": {
+      "patterns": 21,
+      "leaks": 0
+    },
+    "sonnet": {
+      "patterns": 27,
+      "leaks": 0
+    }
+  },
+  "precommit_export_scan": {
+    "all_protected_env_values_checked": true,
+    "raw_canary_format_checked": true,
+    "env_matches": 0,
+    "canary_matches": 0,
+    "runs": 2,
+    "result": "PASS"
+  },
+  "screenshots_committed": false,
+  "screenshot_capture_guard": "page text, HTML and generated content checked before capture",
+  "human_labels_supplied": 0,
+  "reported_traces_verified_by_rest": 44,
+  "persisted_scores_on_reported_traces": 1720,
+  "initial_haiku_stop_breach_disclosed": true
+}
