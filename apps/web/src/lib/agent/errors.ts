@@ -8,6 +8,7 @@ export const VERIFY_FAILED = 'The change still fails its checks after one repair
 export const STEP_LIMIT = 'The agent hit its step limit before finishing. Send another message to let it continue.';
 export const REFUSED = 'The model declined this request. Rephrase it or pick another model.';
 export const SANDBOX_FAILED = 'The preview sandbox stopped responding. Reload to try again.';
+export const SANDBOX_QUOTA = 'The preview sandbox has used its free monthly quota, so new sandboxes are paused until it resets.';
 
 const PROVIDER_NAMES: Record<ProviderId, string> = {openai: 'OpenAI', anthropic: 'Anthropic'};
 
@@ -32,3 +33,8 @@ export function errorStatus(error: unknown): number | string {
   const api = apiError(error);
   return api ? (api.statusCode ?? 'no-status') : error instanceof Error ? error.name : 'unknown';
 }
+
+// Vercel Sandbox answers 402 payment_required once the Hobby quota is used up and creation pauses.
+export const sandboxQuotaExceeded = (error: unknown) => (error as {response?: {status?: number}} | null)?.response?.status === 402;
+
+export const sandboxMessage = (error: unknown) => (sandboxQuotaExceeded(error) ? SANDBOX_QUOTA : SANDBOX_FAILED);

@@ -15,7 +15,7 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, REFUSED, SANDBOX_FAILED, STEP_LIMIT, userMessage, VERIFY_FAILED} from './errors';
+import {errorStatus, REFUSED, sandboxMessage, STEP_LIMIT, userMessage, VERIFY_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
@@ -252,8 +252,9 @@ export function runAgent({
         });
       } catch (error) {
         console.error('[agent] turn failed:', error instanceof Error ? error.message : 'unknown');
-        if (!record.endedAt) end({status: 'error', error: SANDBOX_FAILED});
-        writer.write({type: 'error', errorText: SANDBOX_FAILED});
+        const message = sandboxMessage(error);
+        if (!record.endedAt) end({status: 'error', error: message});
+        writer.write({type: 'error', errorText: message});
       } finally {
         writer.write({type: 'finish', messageMetadata: {status: record.status, notice: noticeFor(record)}});
         // Stopped as soon as the turn ends, so the Hobby CPU quota is not spent idling until the timeout.

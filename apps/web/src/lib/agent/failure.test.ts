@@ -4,7 +4,7 @@ import {APICallError} from 'ai';
 import {convertArrayToReadableStream, MockLanguageModelV4} from 'ai/test';
 import {POST as chatPOST} from '@/app/api/chat/route';
 import {AGENT_CONFIG} from './config';
-import {PROVIDER_FAILED, RATE_LIMITED, REFUSED, SANDBOX_FAILED, STEP_LIMIT, VERIFY_FAILED} from './errors';
+import {PROVIDER_FAILED, RATE_LIMITED, REFUSED, SANDBOX_FAILED, SANDBOX_QUOTA, STEP_LIMIT, VERIFY_FAILED} from './errors';
 import {runTurn, tempProject, textStep, toolStep} from './test-project';
 
 const cleanups: (() => void)[] = [];
@@ -80,6 +80,39 @@ test('sandbox down mid-turn: a readable message and a finished stream', async ()
   expect(record).toMatchObject({status: 'error', error: SANDBOX_FAILED});
   expect(message.metadata).toMatchObject({status: 'error', notice: SANDBOX_FAILED});
   await expectChatStillWorks();
+});
+
+// The shape @vercel/sandbox's APIError has when Hobby creation is paused: HTTP 402 payment_required.
+const quotaError = () =>
+  Object.assign(new Error('Status code 402 is not ok: Hobby plan usage limit exceeded for Snapshots Storage'), {
+    response: new Response(null, {status: 402}),
+    json: {error: {code: 'payment_required', message: 'Hobby plan usage limit exceeded for Snapshots Storage'}},
+  });
+
+test('sandbox quota used up mid-turn: the chat says creation is paused, not that it broke', async () => {
+  const t = project();
+  const paused = {...t.project, run: async () => Promise.reject(quotaError())};
+  const model = new MockLanguageModelV4({doStream: [toolStep([['e1', 'edit_file', {path: 'src/App.tsx', oldString: 'Hi', newString: 'Hello'}]]), textStep('Done.')]});
+  const {chunks, message, record} = await runTurn({model, messages: ask(), project: paused});
+  expect(chunks).toContainEqual({type: 'error', errorText: SANDBOX_QUOTA});
+  expect(record).toMatchObject({status: 'error', error: SANDBOX_QUOTA});
+  expect(message.metadata).toMatchObject({status: 'error', notice: SANDBOX_QUOTA});
+  await expectChatStillWorks();
+});
+
+test('the sandbox route answers a used-up quota with the quota message', async () => {
+  const saved = {...process.env};
+  Object.assign(process.env, {VERCEL_TOKEN: 'fake-token', VERCEL_TEAM_ID: 'team_x', VERCEL_PROJECT_ID: 'prj_x'});
+  const sandboxModule = await import('@/lib/sandbox/sandbox');
+  const route = await import('@/app/api/sandbox/route');
+  const create = spyOn(sandboxModule, 'createSandbox').mockImplementation(() => Promise.reject(quotaError()));
+  try {
+    const res = await route.POST(new Request('http://x/api/sandbox', {method: 'POST', body: JSON.stringify({sandboxId: null})}));
+    expect([res.status, await res.text()]).toEqual([402, SANDBOX_QUOTA]);
+  } finally {
+    create.mockRestore();
+    process.env = saved;
+  }
 });
 
 test('the sandbox stops as soon as the turn ends and the turn records what it used', async () => {

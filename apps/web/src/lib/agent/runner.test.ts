@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {APICallError} from 'ai';
 import {MockLanguageModelV4} from 'ai/test';
 import type {Project} from '../sandbox/project';
+import {SANDBOX_QUOTA} from './errors';
 import {SYSTEM_PROMPT_HASH} from './run';
 import {evalCredential, parseTasks, previewScreenshot, runTasks, type Task} from './runner';
 import {tempProject, textStep, toolStep} from './test-project';
@@ -110,6 +111,27 @@ test('agent:run never holds more than 3 sandboxes, whatever concurrency is asked
   const results = await runTasks({tasks: [{id: 'a', prompt: 'p'}, {id: 'b', prompt: 'q'}], runs: 4, concurrency: 10, outDir: outDir(), model: editingModel, project: p.project, capture: p.capture});
   expect(results).toHaveLength(8);
   expect(p.stats()).toEqual({maxInFlight: 3, inFlight: 0, stops: 8});
+});
+
+test('a paused sandbox quota ends the run with a clear message instead of a crash', async () => {
+  const lines: string[] = [];
+  let created = 0;
+  const quota = Object.assign(new Error('Status code 402 is not ok: Hobby plan usage limit exceeded'), {response: new Response(null, {status: 402})});
+  const results = await runTasks({
+    tasks: [{id: 'a', prompt: 'p'}],
+    runs: 5,
+    outDir: outDir(),
+    model: editingModel,
+    project: async () => {
+      created++;
+      throw quota;
+    },
+    capture: async () => null,
+    log: line => lines.push(line),
+  });
+  expect(results).toEqual([]);
+  expect(lines).toEqual([SANDBOX_QUOTA]);
+  expect(created).toBe(3);
 });
 
 test('a rate-limited run backs off and retries on a fresh sandbox', async () => {

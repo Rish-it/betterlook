@@ -6,7 +6,7 @@ import type {Project} from '../sandbox/project';
 import {CHECKER_DIR, CHECKER_SCRIPT} from '../sandbox/runtime-check';
 import {PREVIEW_PORT} from '../sandbox/starter';
 import {RUNNER_CONFIG} from './config';
-import {RATE_LIMITED} from './errors';
+import {RATE_LIMITED, SANDBOX_QUOTA, sandboxQuotaExceeded} from './errors';
 import {runAgent} from './run';
 import {maskSecrets} from './trace';
 import type {ProviderCredential, ProviderId, SandboxUsage, TurnRecord, TurnStatus} from './types';
@@ -102,10 +102,17 @@ export async function runTasks({
   const jobs = tasks.flatMap(task => Array.from({length: runs}, (_, i) => ({task, run: i + 1})));
   const results: RunSummary[] = [];
   let next = 0;
+  let paused = false;
   const worker = async () => {
-    while (next < jobs.length) {
+    while (!paused && next < jobs.length) {
       const {task, run} = jobs[next++];
-      results.push(await runOnce(task, run, outDir, all));
+      try {
+        results.push(await runOnce(task, run, outDir, all));
+      } catch (error) {
+        if (!sandboxQuotaExceeded(error)) throw error;
+        if (!paused) all.log(SANDBOX_QUOTA);
+        paused = true;
+      }
     }
   };
   const workers = Math.min(concurrency, RUNNER_CONFIG.concurrency, jobs.length);
