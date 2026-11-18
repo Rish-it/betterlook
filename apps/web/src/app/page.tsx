@@ -6,6 +6,7 @@ import * as stylex from '@stylexjs/stylex';
 import {Button} from '@astryxdesign/core/Button';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {HStack, VStack} from '@astryxdesign/core/Layout';
+import {colorVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {Composer} from '@/composer/Composer';
 
 const EXAMPLES = [
@@ -17,11 +18,25 @@ const EXAMPLES = [
 
 const styles = stylex.create({
   main: {
+    position: 'relative',
+    isolation: 'isolate',
+    overflow: 'hidden',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: '100dvh',
     padding: 16,
+  },
+  dither: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: -1,
+    pointerEvents: 'none',
+    opacity: 0.24,
+    color: colorVars['--color-text-secondary'],
+    backgroundImage: 'radial-gradient(circle, currentColor 0.7px, transparent 0.9px), radial-gradient(ellipse at 20% 0%, currentColor, transparent 65%)',
+    backgroundSize: '4px 4px, 100% 100%',
+    maskImage: 'radial-gradient(ellipse 90% 70% at 50% 0%, #000 10%, transparent 85%)',
   },
   column: {width: '100%', maxWidth: 720},
 });
@@ -34,6 +49,7 @@ export default function Home() {
 
   return (
     <main {...stylex.props(styles.main)}>
+      <div aria-hidden="true" {...stylex.props(styles.dither)} />
       <VStack gap={6} xstyle={styles.column}>
         <Heading level={1}>What should we change?</Heading>
         <Composer autoFocus placeholder="Describe a change to your app" onSubmit={send} value={draft} onChange={setDraft} />
