@@ -113,6 +113,7 @@ export function runAgent({
   abortSignal,
   keepSandbox = false,
   evals,
+  traceAttributes = {},
 }: {
   model: Exclude<LanguageModel, string>;
   messages: ModelMessage[];
@@ -121,6 +122,8 @@ export function runAgent({
   keepSandbox?: boolean;
   // job: the collector run inside verify's browser session. live: also read the rest of the evidence and score the turn (Trigger A).
   evals?: {job: HookJob; live: boolean};
+  // Extra trace attributes, e.g. the Langfuse experiment an eval run belongs to.
+  traceAttributes?: Record<string, string>;
 }) {
   const span = trace.getTracer(TRACER_NAME).startSpan('betterlook.turn');
   const spanContext = trace.setSpan(context.active(), span);
@@ -158,6 +161,8 @@ export function runAgent({
     'langfuse.trace.metadata.turnId': record.id,
     'langfuse.trace.metadata.systemPromptHash': record.systemPromptHash,
     'langfuse.trace.metadata.toolConfigHash': record.toolConfigHash,
+    ...traceAttributes,
+    ...('langfuse.experiment.item.id' in traceAttributes ? {'langfuse.experiment.item.root_observation_id': span.spanContext().spanId} : {}),
   });
 
   let resolveTurn: (turn: TurnRecord) => void;

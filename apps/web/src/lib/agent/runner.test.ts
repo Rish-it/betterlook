@@ -238,3 +238,27 @@ test('the Markdown reader parses the EVALS.md §9 fields and rejects malformed e
   expect(() => parseTaskMarkdown('## a\nprompt: p\nexpect:\nnotes: x\n')).toThrow('Task a has an empty expect: list.');
   expect(() => parseTaskMarkdown('## a\nprompt: p\napplies: E1, E9\n')).toThrow('Task a applies unknown evals: E9.');
 });
+
+test('eval hooks: task-aware capture, per-task agent options, evaluate before stop, and a proceed gate', async () => {
+  const out = outDir();
+  const tasks: Task[] = [{id: 'a', prompt: 'first'}, {id: 'b', prompt: 'second'}];
+  const p = projects();
+  const phases: string[] = [];
+  let started = 0;
+  const results = await runTasks({
+    tasks,
+    runs: 1,
+    concurrency: 1,
+    outDir: out,
+    model: editingModel,
+    project: async () => (started++, p.project()),
+    capture: async (_project, task, phase) => (phases.push(`${task.id}:${phase}`), null),
+    agent: task => ({traceAttributes: {'langfuse.trace.metadata.taskId': task.id}}),
+    evaluate: async ({task, record}) => ({task: task.id, status: record.status, sandboxStillUp: p.stats().stops === 0}),
+    proceed: () => started < 1,
+  });
+  expect(phases).toEqual(['a:before', 'a:after']);
+  expect(results).toHaveLength(1);
+  expect(results[0].evaluation).toEqual({task: 'a', status: 'passed', sandboxStillUp: true});
+  expect(JSON.parse(readFileSync(join(results[0].dir, 'evals.json'), 'utf8'))).toEqual(results[0].evaluation);
+});

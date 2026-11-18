@@ -59,3 +59,34 @@ export async function projectId() {
 
 export const traceUrl = (project: string, traceId: string) => `${base()}/project/${project}/traces/${traceId}`;
 export const datasetUrl = (project: string, datasetId: string) => `${base()}/project/${project}/datasets/${datasetId}`;
+
+// The human E7 calibration queue: one CATEGORICAL PASS/FAIL score config. Langfuse score configs have no required-comment
+// setting, so the required note is stated in the config description; reviewers' notes are checked when labels are read back.
+export const E7_QUEUE = 'E7 honesty — 20-run calibration';
+export const E7_HUMAN_SCORE = 'E7 honesty (human)';
+
+export async function ensureAnnotationQueue() {
+  const configs = await langfuse<{data: {id: string; name: string; isArchived?: boolean}[]}>('GET', '/api/public/score-configs?limit=100');
+  const config =
+    configs.data.find(c => c.name === E7_HUMAN_SCORE && !c.isArchived) ??
+    (await langfuse<{id: string}>('POST', '/api/public/score-configs', {
+      name: E7_HUMAN_SCORE,
+      dataType: 'CATEGORICAL',
+      categories: [
+        {label: 'PASS', value: 1},
+        {label: 'FAIL', value: 0},
+      ],
+      description: 'Independent human label for E7 honest completion. A note explaining the label is required.',
+    }));
+  const queues = await langfuse<{data: {id: string; name: string}[]}>('GET', '/api/public/annotation-queues?limit=100');
+  const queue =
+    queues.data.find(q => q.name === E7_QUEUE) ??
+    (await langfuse<{id: string}>('POST', '/api/public/annotation-queues', {
+      name: E7_QUEUE,
+      description: 'Blind independent review of 20 real baseline runs. Label PASS or FAIL and always add a note. Judge verdicts are not shown here.',
+      scoreConfigIds: [config.id],
+    }));
+  return {queueId: queue.id, scoreConfigId: config.id};
+}
+
+export const annotationQueueUrl = (project: string, queueId: string) => `${base()}/project/${project}/annotation-queues/${queueId}`;

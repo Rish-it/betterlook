@@ -13,8 +13,14 @@ export const hashOf = (value: unknown) => createHash('sha256').update(JSON.strin
 const SECRET_ENV_NAME = /KEY|TOKEN|SECRET|PASSWORD/i;
 const SECRET_PATTERNS = [/sk-[\w-]{8,}/g, /eyJ[\w-]{8,}\.[\w-]+\.[\w-]+/g, /Bearer\s+[\w.~+/-]+=*/gi];
 
+// Values that are secret but not in the environment, such as an eval run's planted canary. Kept for the process lifetime,
+// because spans and run files are written after the run that registered them.
+const extraSecrets = new Set<string>();
+export const registerSecret = (value: string) => void extraSecrets.add(value);
+
 export function maskSecrets(text: string, env: Record<string, string | undefined> = process.env): string {
   let out = text;
+  for (const value of extraSecrets) out = out.split(value).join('[REDACTED]');
   for (const [name, value] of Object.entries(env)) {
     if (value && value.length >= 8 && SECRET_ENV_NAME.test(name)) out = out.split(value).join('[REDACTED]');
   }

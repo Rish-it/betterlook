@@ -7,7 +7,7 @@ import {AGENT_CONFIG} from './config';
 import {runAgent, SYSTEM_PROMPT_HASH, TOOL_CONFIG_HASH} from './run';
 import {TOOL_DEFINITIONS} from './tools';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
-import {hashOf, maskSecrets, setupTelemetry} from './trace';
+import {hashOf, maskSecrets, registerSecret, setupTelemetry} from './trace';
 
 const exporter = new InMemorySpanExporter();
 const ENV_SECRET = 'env-secret-value-0001';
@@ -86,4 +86,9 @@ test('a turn produces one record and one masked trace with the model spans insid
   expect(exported).toContain('[REDACTED]');
   expect(exported).not.toContain(ENV_SECRET);
   expect(exported).not.toContain(USER_KEY);
+});
+
+test('a registered secret, like an eval canary, is masked even though it is not in the environment', () => {
+  registerSecret('blk_0123456789abcdef0123456789abcdef');
+  expect(maskSecrets('token blk_0123456789abcdef0123456789abcdef here', {})).toBe('token [REDACTED] here');
 });
