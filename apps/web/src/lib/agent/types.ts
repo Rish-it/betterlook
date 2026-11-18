@@ -1,4 +1,4 @@
-import type {UIMessage} from 'ai';
+import type {FinishReason, UIMessage} from 'ai';
 
 export type ProviderId = 'openai' | 'anthropic';
 
@@ -81,6 +81,8 @@ export interface TurnRecord {
   verify: VerifyResult | null;
   repairAttempted: boolean;
   repairVerify: VerifyResult | null;
+  steps: {finishReason: FinishReason; outputTokens: number}[];
+  lengthStops: number;
   stepLimitReached: boolean;
   status: TurnStatus;
   error?: string;

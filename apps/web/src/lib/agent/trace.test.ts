@@ -68,6 +68,8 @@ test('a turn produces one record and one masked trace with the model spans insid
     toolConfigHash: TOOL_CONFIG_HASH,
     status: 'passed',
     usage: {inputTokens: 12, outputTokens: 5, cachedInputTokens: 10, costUsd: null},
+    steps: [{finishReason: 'stop', outputTokens: 5}],
+    lengthStops: 0,
   });
   expect(record.endedAt).not.toBeNull();
 
@@ -78,6 +80,7 @@ test('a turn produces one record and one masked trace with the model spans insid
   expect(spans.length).toBeGreaterThan(1);
   expect(JSON.parse(root.attributes['langfuse.trace.output'] as string)).toMatchObject({id: record.id, status: 'passed'});
   expect(root.attributes['langfuse.trace.metadata.toolConfigHash']).toBe(record.toolConfigHash);
+  expect(root.attributes['langfuse.trace.metadata.lengthStops']).toBe(0);
 
   const exported = JSON.stringify(spans.map(s => ({a: s.attributes, e: s.events})));
   expect(exported).toContain('[REDACTED]');

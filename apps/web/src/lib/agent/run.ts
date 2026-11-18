@@ -114,6 +114,8 @@ export function runAgent({
     verify: null,
     repairAttempted: false,
     repairVerify: null,
+    steps: [],
+    lengthStops: 0,
     stepLimitReached: false,
     status: 'running',
     checkpoint: null,
@@ -136,6 +138,7 @@ export function runAgent({
     span.setAttributes({
       'langfuse.trace.output': JSON.stringify(record),
       'langfuse.trace.metadata.status': record.status,
+      'langfuse.trace.metadata.lengthStops': record.lengthStops,
       'langfuse.trace.metadata.checkpointId': record.checkpoint?.id ?? '',
     });
     span.end();
@@ -200,6 +203,8 @@ export function runAgent({
       const settled = (outcome: Outcome) => {
         if (outcome.type === 'end') {
           addUsage(record.usage, outcome.event.totalUsage);
+          record.steps.push(...outcome.event.steps.map(s => ({finishReason: s.finishReason, outputTokens: s.usage.outputTokens ?? 0})));
+          record.lengthStops = record.steps.filter(s => s.finishReason === 'length').length;
           if (outcome.event.finishReason === 'content-filter') {
             end({status: 'error', error: REFUSED});
             return false;

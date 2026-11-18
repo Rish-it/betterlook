@@ -105,3 +105,28 @@ test('every model call sets the configured effort and summarized thinking, repai
     expect(call.providerOptions?.anthropic).toEqual({fallbacks: 'default', effort: 'medium', thinking: {type: 'adaptive', display: 'summarized'}});
   }
 });
+
+test('the turn record keeps each step finish reason and output tokens, and counts length stops', async () => {
+  const cut = {
+    stream: simulateReadableStream({
+      chunks: [
+        {type: 'text-start' as const, id: 't'},
+        {type: 'text-delta' as const, id: 't', delta: 'A long answer that'},
+        {type: 'text-end' as const, id: 't'},
+        {type: 'finish' as const, finishReason: {unified: 'length' as const, raw: 'max_tokens'}, logprobs: undefined, usage: {...usage, outputTokens: {total: 32_000, text: 32_000, reasoning: undefined}}},
+      ],
+    }),
+  };
+  const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'});
+  const model = new MockLanguageModelV4({doStream: [toolStep([['l1', 'list_files', {}]]), cut]});
+  try {
+    const {record} = await runTurn({model, messages: [{role: 'user', content: 'explain'}], project: t.project});
+    expect(record.steps).toEqual([
+      {finishReason: 'tool-calls', outputTokens: 1},
+      {finishReason: 'length', outputTokens: 32_000},
+    ]);
+    expect(record.lengthStops).toBe(1);
+  } finally {
+    t.cleanup();
+  }
+});
