@@ -154,7 +154,7 @@ test('the sandbox route says so when it is not configured', async () => {
   expect(await res.text()).toBe('The preview sandbox is not configured yet.');
 });
 
-test('on Vercel the SDK uses its own OIDC credentials; elsewhere the token triple is passed', async () => {
+test('the sandbox is off unless the token triple is set or a deployment opts in, and the opt-in uses the SDK\'s own OIDC', async () => {
   const saved = {...process.env};
   const triple = {VERCEL_TOKEN: 'fake-token', VERCEL_TEAM_ID: 'team_x', VERCEL_PROJECT_ID: 'prj_x'};
   const createParams = async () => {
@@ -163,17 +163,16 @@ test('on Vercel the SDK uses its own OIDC credentials; elsewhere the token tripl
     return JSON.parse(calls.find(c => c.startsWith('create '))!.slice('create '.length));
   };
   try {
-    for (const key of ['VERCEL', 'VERCEL_OIDC_TOKEN', ...Object.keys(triple)]) delete process.env[key];
+    for (const key of ['VERCEL', 'VERCEL_OIDC_TOKEN', 'BETTERLOOK_SANDBOX', ...Object.keys(triple)]) delete process.env[key];
+    Object.assign(process.env, {VERCEL: '1', VERCEL_OIDC_TOKEN: 'runtime-oidc'});
     expect(sandboxConfigured()).toBe(false);
 
-    process.env.VERCEL = '1';
+    process.env.BETTERLOOK_SANDBOX = 'on';
     expect(sandboxConfigured()).toBe(true);
     expect(await createParams()).not.toHaveProperty('token');
 
+    for (const key of ['VERCEL', 'VERCEL_OIDC_TOKEN', 'BETTERLOOK_SANDBOX']) delete process.env[key];
     Object.assign(process.env, triple);
-    expect(await createParams()).not.toHaveProperty('token');
-
-    delete process.env.VERCEL;
     expect(sandboxConfigured()).toBe(true);
     expect(await createParams()).toMatchObject({token: 'fake-token', teamId: 'team_x', projectId: 'prj_x'});
   } finally {

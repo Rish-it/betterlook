@@ -11,14 +11,16 @@ type SandboxApi = {Sandbox: Pick<typeof Sandbox, 'create' | 'get' | 'getOrCreate
 const vercelSandbox = async (): Promise<SandboxApi> => import('@vercel/sandbox');
 export type SandboxInfo = {sandboxId: string; previewUrl: string};
 
-// On Vercel the SDK reads the per-request OIDC token (x-vercel-oidc-token) itself; the token triple is for local dev and agent:run.
-export const sandboxConfigured = () =>
-  Boolean(process.env.VERCEL || process.env.VERCEL_OIDC_TOKEN || (process.env.VERCEL_TOKEN && process.env.VERCEL_TEAM_ID && process.env.VERCEL_PROJECT_ID));
-
-const credentials = () => {
-  const {VERCEL, VERCEL_TOKEN: token, VERCEL_TEAM_ID: teamId, VERCEL_PROJECT_ID: projectId} = process.env;
-  return !VERCEL && token && teamId && projectId ? {token, teamId, projectId} : {};
+const tokenTriple = () => {
+  const {VERCEL_TOKEN: token, VERCEL_TEAM_ID: teamId, VERCEL_PROJECT_ID: projectId} = process.env;
+  return token && teamId && projectId ? {token, teamId, projectId} : null;
 };
+
+// Local dev and agent:run use the token triple. A deployment opts in with BETTERLOOK_SANDBOX=on and passes no credentials,
+// so the SDK reads the per-request OIDC token (x-vercel-oidc-token) itself. Production sets neither and stays sandbox-less.
+export const sandboxConfigured = () => Boolean(tokenTriple()) || process.env.BETTERLOOK_SANDBOX === 'on';
+
+const credentials = () => tokenTriple() ?? {};
 
 async function run(sandbox: Sandbox, cmd: string, args: string[], opts: {sudo?: boolean; env?: Record<string, string>} = {}) {
   const result = await sandbox.runCommand({cmd, args, ...opts});
