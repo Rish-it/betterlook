@@ -46,7 +46,23 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - `bun run typecheck`: exit 0 on two clean runs (tsbuildinfo removed before the second). `npx react-doctor@latest`: 100/100. No console errors; scrollWidth 1280 at 1280px.
   - Screenshots, checked by eye: `.screenshots/ai-02-fixtures-light.png` and `.screenshots/ai-02-fixtures-dark.png` (full page, every state visible, no borders).
   - Note: `ProviderId` in types.ts v1 is `'anthropic'` only, while the first provider is OpenAI. Fixtures avoid building a whole `TurnRecord`, so this doesn't block me. AI-CORE will need to widen it.
-- [ ] Conversation and Message, with streaming text and reasoning.
+- [x] Conversation and Message, with streaming text and reasoning.
+
+  - `components/ai/Conversation.tsx`: `{messages: UIMessage[]; isStreaming: boolean; composer: ReactNode}` on `ChatLayout` and `ChatMessageList`. Astryx handles stick-to-bottom and the scroll-to-latest button; `isStreaming` sets `aria-busy` on the `role="log"` list, so a screen reader announces a finished reply once rather than every token. Checked in the DOM: `aria-busy="true"` while streaming, removed once done.
+  - `components/ai/Message.tsx`: `{message: UIMessage}`. A user message is a filled bubble. An assistant message renders its parts in order:
+    - text uses `Markdown`, with `isStreaming` from `part.state`, which fades in the newest word
+    - reasoning is a `Collapsible`: "Thinking", open while streaming; "Thought", collapsed once done; `aria-expanded` is on the trigger
+    - tool parts render through `ToolCall`
+    - the model label comes from `metadata.model` (shows "GPT-5")
+  - `components/ai/ToolCall.tsx`: minimal for now. It maps every `ai` v7 tool state to an `ChatToolCalls` status, with the error text on `output-error`. Item 5 adds the argument summary, expand-to-detail and the denied call.
+  - Dev page: a live `Conversation` replays a streaming reply every few seconds, and each fixture message also renders on its own.
+  - Screenshots, checked by eye:
+    - `.screenshots/ai-03-conversation-{light,dark}.png`: mid-stream, stuck to the bottom
+    - `.screenshots/ai-03-scrolled-up-{light,dark}.png`: scrolled to the top, scroll-to-latest button showing
+    - `.screenshots/ai-03-messages-{light,dark}.png`: full page with every message state (done and streaming reasoning, done/running/error/pending tools, done and streaming text)
+    - all borderless; no console errors; no horizontal scroll at 1280px
+  - `bun run typecheck`: exit 0 on two clean runs.
+  - `react-doctor`: I fixed the non-component export in `ToolCall.tsx`. Two `no-array-index-as-key` warnings remain in `Message.tsx`. I judged them false positives: `TextUIPart` has no id and a message's parts are append-only, so the index is their stable identity. Reasoning uses `part.id` when it has one. A one-line comment in the code records why.
 - [ ] Prompt input upgrade.
 - [ ] Tool call row and denied call.
 - [ ] Approval card.

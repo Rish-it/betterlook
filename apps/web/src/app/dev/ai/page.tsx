@@ -1,16 +1,21 @@
 'use client';
 
-import type {ReactNode} from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
+import type {UIMessage} from 'ai';
 import {notFound} from 'next/navigation';
 import * as stylex from '@stylexjs/stylex';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {VStack} from '@astryxdesign/core/Layout';
 import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import * as f from '@/components/ai/fixtures';
+import {Conversation} from '@/components/ai/Conversation';
+import {Message} from '@/components/ai/Message';
+import {Composer} from '@/composer/Composer';
 
 const styles = stylex.create({
   main: {maxWidth: 880, marginInline: 'auto', padding: 16, paddingBlockEnd: 96},
   borderless: {borderColor: 'transparent', boxShadow: 'none'},
+  chatFrame: {height: 560, display: 'flex', flexDirection: 'column'},
 });
 
 function State({label, children}: {label: string; children: ReactNode}) {
@@ -37,6 +42,35 @@ function Section({title, children}: {title: string; children: ReactNode}) {
   );
 }
 
+const STREAM_WORDS = 'I found the nav in Header.tsx. Sticky positioning needs a top offset and a background so content does not show through. I am adding position sticky, top 0 and the surface token, then running typecheck again.'.split(' ');
+
+function withStreamedText(messages: UIMessage[], words: number): UIMessage[] {
+  const last = messages[messages.length - 1];
+  const done = words >= STREAM_WORDS.length;
+  const parts = last.parts.map(p =>
+    p.type === 'text' ? {...p, text: STREAM_WORDS.slice(0, words).join(' '), state: done ? ('done' as const) : ('streaming' as const)} : p,
+  );
+  return [...messages.slice(0, -1), {...last, parts}];
+}
+
+function StreamingConversation() {
+  const [words, setWords] = useState(1);
+  useEffect(() => {
+    const id = setInterval(() => setWords(w => (w >= STREAM_WORDS.length + 10 ? 1 : w + 1)), 150);
+    return () => clearInterval(id);
+  }, []);
+  const isStreaming = words < STREAM_WORDS.length;
+  return (
+    <div {...stylex.props(styles.chatFrame)}>
+      <Conversation
+        messages={withStreamedText(f.messages, words)}
+        isStreaming={isStreaming}
+        composer={<Composer placeholder="Describe a change" onSubmit={() => {}} />}
+      />
+    </div>
+  );
+}
+
 export default function AiDevPage() {
   if (process.env.NODE_ENV === 'production') notFound();
 
@@ -46,9 +80,12 @@ export default function AiDevPage() {
         <Heading level={1}>AI components</Heading>
 
         <Section title="Conversation and Message">
+          <State label="conversation: replays a streaming reply; scroll up to see the scroll-to-latest button">
+            <StreamingConversation />
+          </State>
           {f.messages.map(m => (
             <State key={m.id} label={`${m.role} ${m.id}`}>
-              <Fixture value={m.parts} />
+              <Message message={m} />
             </State>
           ))}
         </Section>
