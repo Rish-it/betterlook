@@ -86,41 +86,35 @@ The specification is `evals/EVALS.md` (SHA-256 `36d8f183d42c9b3c35c347fa429774c4
 
 **E7 judge.** It uses the spec's instruction word for word and stores its SHA-256 and the resolved model ID. It runs on `OPENAI_EVAL_API_KEY` when set; otherwise on `claude-haiku-5-5`, marked `same_family: true`. Human labels are collected separately and are never filled in automatically.
 
-**Config hash.** Every scored run records a config hash over the system and repair prompts, the agent config, the tool definitions, the `DESIGN.md` hash, the judge instruction hash and the evaluator version. Current config hash (SHA-256): `c2c606b14cffed75694742d65f6d66a7fb0685a8280f8080dec2706530b78f95`.
+**Config hash.** Every scored run records a config hash over the system and repair prompts, the agent config, the tool definitions, the `DESIGN.md` hash, the judge instruction hash and the evaluator version. Current config hash (SHA-256): `8c1d333e3abf5f5c9fd394618169d5946a02d32292ff110dcb5b110a0196dfa0`.
 
 **Progress** is tracked item by item, with proof, in `eval-progress.md`.
 
 ### Baseline scores
 
-2026-11-18: **NOT_EVALUATED — sandbox setup blocked before any task execution.** The provider models API confirms `claude-haiku-5-5` and `claude-sonnet-5-5` (HTTP 200, exact IDs). Vercel cannot resume the stopped starter base: HTTP 400, `Cannot resume sandbox: no snapshot available`. Its snapshot list is empty. Deleting that external sandbox requires the founder's permission.
+2026-11-19 (IST). Baseline configuration: **empty system prompt plus DESIGN.md context**. Provider-confirmed IDs are `claude-haiku-5-5` and `claude-sonnet-5-5`; no substitute model is used. Taskset SHA-256: `5c33dfd1df6cb9c9b7222412bfd7e5337343f4165aa08b981a7aa10a01d08e60`. Config SHA-256: `8c1d333e3abf5f5c9fd394618169d5946a02d32292ff110dcb5b110a0196dfa0`. Starter SHA-256: `1eeff41a8ee23d3c2a7f3e1385c1c484bee84c3e84a1478e89243c6b0bfeff1c`.
 
-Executed/expected: **Haiku 0/60; Sonnet 0/24**. All 84 executions are unstarted because preflight item 9 is incomplete; there are zero executed task errors. The baseline is configured with an **empty system prompt plus DESIGN.md context**; no baseline has run.
+**Haiku: requested reporting cohort 20/60.** Five real trials each ran for `copy-edit`, `spacing-edit`, `add-section` and `hero-change`. The remaining 40 trial slots are NOT_EVALUATED with reason `stopped at 20/60 by founder` (E8 remains NOT_APPLICABLE on ordinary tasks).
 
-| Model | Eval | pass@1 | pass^k | PASS | FAIL | NOT_EVALUATED | NOT_APPLICABLE | Expected trials |
-|---|---|---|---|---|---|---|---|---|
-| `claude-haiku-5-5` | E1 | 0/12 | 0/12 (k=5) | 0/60 | 0/60 | 60/60 | 0/60 | 60 |
-| `claude-haiku-5-5` | E2 | 0/12 | 0/12 (k=5) | 0/60 | 0/60 | 60/60 | 0/60 | 60 |
-| `claude-haiku-5-5` | E3 | 0/12 | 0/12 (k=5) | 0/60 | 0/60 | 60/60 | 0/60 | 60 |
-| `claude-haiku-5-5` | E4 | 0/12 | 0/12 (k=5) | 0/60 | 0/60 | 60/60 | 0/60 | 60 |
-| `claude-haiku-5-5` | E5 | 0/12 | 0/12 (k=5) | 0/60 | 0/60 | 60/60 | 0/60 | 60 |
-| `claude-haiku-5-5` | E6 | 0/12 | 0/12 (k=5) | 0/60 | 0/60 | 60/60 | 0/60 | 60 |
-| `claude-haiku-5-5` | E7 | 0/12 | 0/12 (k=5) | 0/60 | 0/60 | 60/60 | 0/60 | 60 |
-| `claude-haiku-5-5` | E8 | 0/3 | 0/3 (k=5) | 0/60 | 0/60 | 15/60 | 45/60 | 60 |
-| `claude-sonnet-5-5` | E1 | 0/12 | 0/12 (k=2) | 0/24 | 0/24 | 24/24 | 0/24 | 24 |
-| `claude-sonnet-5-5` | E2 | 0/12 | 0/12 (k=2) | 0/24 | 0/24 | 24/24 | 0/24 | 24 |
-| `claude-sonnet-5-5` | E3 | 0/12 | 0/12 (k=2) | 0/24 | 0/24 | 24/24 | 0/24 | 24 |
-| `claude-sonnet-5-5` | E4 | 0/12 | 0/12 (k=2) | 0/24 | 0/24 | 24/24 | 0/24 | 24 |
-| `claude-sonnet-5-5` | E5 | 0/12 | 0/12 (k=2) | 0/24 | 0/24 | 24/24 | 0/24 | 24 |
-| `claude-sonnet-5-5` | E6 | 0/12 | 0/12 (k=2) | 0/24 | 0/24 | 24/24 | 0/24 | 24 |
-| `claude-sonnet-5-5` | E7 | 0/12 | 0/12 (k=2) | 0/24 | 0/24 | 24/24 | 0/24 | 24 |
-| `claude-sonnet-5-5` | E8 | 0/3 | 0/3 (k=2) | 0/24 | 0/24 | 6/24 | 18/24 | 24 |
+**Stop-limit breach:** the CLI lacked a runtime stop control and scheduling was stopped late: **23 executions actually completed**, including three `pixel-keyword` trials outside the requested first-20 cohort. They are excluded from the table, retained in the audit evidence, and their cost is included below. The other 37 slots never started. All 23 sandboxes are verified stopped through read-only API calls; the process exited cleanly. The Langfuse experiment therefore contains 23 items, rather than 20.
 
-The zero pass numerators indicate no observed passes, not measured failure rates. E8 applies to three tasks; the other nine are NOT_APPLICABLE even when unstarted. E1–E7 apply to all twelve tasks.
+`pass@1` below uses the four tasks with a first trial; `pass^5` uses the four tasks with all five trials. Eight other tasks have NOT_EVALUATED reliability, never inferred passes. These are partial-cohort rates, not full-12-task reliability. Counts use all 60 expected trial slots.
 
-Taskset SHA-256: `5c33dfd1df6cb9c9b7222412bfd7e5337343f4165aa08b981a7aa10a01d08e60`. Config SHA-256: `c2c606b14cffed75694742d65f6d66a7fb0685a8280f8080dec2706530b78f95`. DESIGN.md SHA-256: `165954ebfef609896e08f2b19c23248fee89ded433d8cca0a7e847d9ad9c0cbb`.
+| Eval | pass@1, observed tasks | pass^5, complete tasks | PASS | FAIL | NOT_EVALUATED | NOT_APPLICABLE |
+|---|---|---|---|---|---|---|
+| E1 | 4/4 | 3/4 | 19/60 | 1/60 | 40/60 | 0/60 |
+| E2 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E3 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E4 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E5 | 4/4 | 4/4 | 20/60 | 0/60 | 40/60 | 0/60 |
+| E6 | 4/4 | 2/4 | 18/60 | 2/60 | 40/60 | 0/60 |
+| E7 | 4/4 | 2/4 | 18/60 | 2/60 | 40/60 | 0/60 |
+| E8 | NOT_EVALUATED | NOT_EVALUATED | 0/60 | 0/60 | 15/60 | 45/60 |
 
-Langfuse credentials authenticate, but no dataset, experiment, score or annotation queue was created in this attempt; their links are unavailable. No E7 blind records or failing traces exist to export or review. E8 high-severity hits and false refusals, E7 same-family count, cost per completed task, actual total USD and added_verify_ms are NOT_EVALUATED, since no task ran. Independent human labels remain absent.
+Haiku E8 has no executed applicable trials; its 15 applicable slots are NOT_EVALUATED and the other 45 are NOT_APPLICABLE. Automated E7 results have no independent human labels. The first-20 cohort cost is **$0.0316215**; the three extra executions cost **$0.0073631**; the smoke cost **$0.0010237**. **Real total so far: $0.0400083; remaining of USD 10: $9.9599917**, from provider usage and the repo's dated price table. All E7 judge calls are included. Cohort cost per completed task is $0.001581075; recorded added_verify_ms mean is 849.8 ms. E8 high-severity hits and benign false refusals are unmeasured for this cohort because E8 tasks did not run.
 
-The failed starter-base setup used **8,895 ms active CPU**, separate from task CPU. Smoke task CPU, the 84-run projection and the Vercel Hobby quota risk cannot be quantified until a smoke run completes. Linux Chromium never started, so E4f is NOT_EVALUATED; provider `fallbacks` compatibility is also untested and unchanged.
+[Langfuse dataset](https://us.cloud.langfuse.com/api/public/v2/datasets/betterlook-evals-v1), [Haiku experiment](https://us.cloud.langfuse.com/api/public/experiments?fromStartTime=2026-11-18T18%3A00%3A00Z&id=e4d5837d7583d278), [E7 annotation queue](https://us.cloud.langfuse.com/api/public/annotation-queues/cmwmgtsxv0116ad0es4dlapnx). These are verified authenticated REST response URLs; the API does not return dashboard links. The smoke's 39 scores and the experiment identity are confirmed through public REST. No browser is used for Langfuse verification.
 
-Preflight: `bun --no-env-file test` passes twice (183 tests, zero failures); `bun --no-env-file run typecheck` passes twice. The Git environment leak and single-task CLI regression tests also pass after their respective commits. See `eval-progress.md` for commands, evidence and the exact resume blocker.
+**Sonnet: 0/24, pending execution after this report commit.** E1–E7 are NOT_EVALUATED for all 24 slots; E8 has 6 NOT_EVALUATED and 18 NOT_APPLICABLE slots. No Sonnet rate is inferred.
+
+Verification before the baseline: `bun --no-env-file run typecheck` and `bun --no-env-file test` pass in two separate runs (190 tests, zero failures). Linux starter E2–E4 pass, including E4f=`antialiased`. The successful base rebuild consumed 43,561 ms active CPU, separately from the earlier failed setup's 8,895 ms and the smoke's 17,777 ms. Security scans check every nonempty .env value except the explicitly permitted public `LANGFUSE_BASE_URL`; no protected value or canary matches were found. Full exports, Sonnet results and trace reviews follow in item 12.
