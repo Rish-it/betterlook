@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {useSearchParams} from 'next/navigation';
 import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
@@ -27,6 +28,7 @@ import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
 import {PreviewToolbar, type PreviewTab} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
+import {CodeView} from '@/components/ai/CodeView';
 import {changedFiles, startedBuilding, unshownApprovals} from '@/components/ai/turn';
 import {projectTitle, UNTITLED} from '@/components/ai/title';
 
@@ -95,6 +97,10 @@ const styles = stylex.create({
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
+  },
+  chatGutter: {
+    boxSizing: 'border-box',
+    paddingInline: {default: spacingVars['--spacing-6'], [NARROW]: spacingVars['--spacing-3']},
   },
   handle: {
     display: {default: null, [NARROW]: 'none'},
@@ -166,9 +172,10 @@ type PreviewPaneProps = {
 
 function PreviewPane({preview, frameKey, isLoading, onLoad, onRefresh, isHiddenWhenNarrow}: PreviewPaneProps) {
   const [hasPreview, setHasPreview] = useState(false);
+  const searchParams = useSearchParams();
   // ChatGPT sign-in returns with ?chatgpt=<issue>, which the connection controls show.
   const [tab, setTab] = useState<PreviewTab>(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('chatgpt') ? 'settings' : 'preview',
+    searchParams.has('chatgpt') ? 'settings' : 'preview',
   );
   return (
     <section
@@ -209,6 +216,11 @@ function PreviewPane({preview, frameKey, isLoading, onLoad, onRefresh, isHiddenW
           )
         )}
       </div>
+      {tab === 'code' && (
+        <div id="code-panel" role="tabpanel" aria-label="Code" {...stylex.props(styles.stage)}>
+          <CodeView sandboxId={readStored(SANDBOX_KEY)} revision={frameKey} />
+        </div>
+      )}
       <div id="settings-panel" role="tabpanel" aria-label="Settings" {...stylex.props(styles.settings, tab !== 'settings' && styles.hidden)}>
         <VStack gap={2} align="start">
           <Text weight="semibold">Models</Text>
@@ -247,7 +259,8 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const [title, setTitle] = useState('');
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
-  const [isFrameLoading, setIsFrameLoading] = useState(true);
+  const [loadedFrameKey, setLoadedFrameKey] = useState<number | null>(null);
+  const isFrameLoading = loadedFrameKey !== frameKey;
   const hasBuilt = useHasBuilt(messages);
 
   // A send waits for its provider's key: the text stays in the composer and no request goes out.
@@ -310,7 +323,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     sandboxRequest.then(next => {
       if (!isCurrent) return;
       // Same src as the frame already shows means no new onLoad, so only a new url may show the spinner.
-      if (next.url !== PREVIEW_URL) setIsFrameLoading(true);
+      if (next.url !== PREVIEW_URL) setLoadedFrameKey(null);
       setPreview(next);
     });
     return () => {
@@ -332,8 +345,10 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     if (messages.length > 0 && !isBusy) localStorage.setItem(CHAT_KEY, JSON.stringify(messages));
   }, [messages, isBusy]);
 
-  const refresh = () => {
-    setIsFrameLoading(true);
+  const refresh = async () => {
+    setLoadedFrameKey(null);
+    const next = await (sandboxRequest = requestSandbox());
+    setPreview(next);
     setFrameKey(k => k + 1);
   };
 
@@ -384,7 +399,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
         <div ref={containerRef} {...stylex.props(styles.split)}>
           <section
             aria-label="Chat"
-            {...stylex.props(hasBuilt ? styles.chat(resizable.size) : styles.chatOnly, view !== 'chat' && styles.hiddenWhenNarrow)}>
+            {...stylex.props(hasBuilt ? styles.chat(resizable.size) : styles.chatOnly, styles.chatGutter, view !== 'chat' && styles.hiddenWhenNarrow)}>
             <Conversation
               messages={messages}
               isStreaming={isBusy}
@@ -433,7 +448,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                 preview={preview}
                 frameKey={frameKey}
                 isLoading={isFrameLoading}
-                onLoad={() => setIsFrameLoading(false)}
+                onLoad={() => setLoadedFrameKey(frameKey)}
                 onRefresh={refresh}
                 isHiddenWhenNarrow={view !== 'preview'}
               />
