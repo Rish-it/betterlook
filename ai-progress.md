@@ -112,6 +112,13 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
 - `7449b371` orchestrator request (for AI-UI): `VerifyCheck.ok: boolean` is replaced by `status: VerifyCheckStatus` (`'passed' | 'failed' | 'skipped'`), so a runtime check skipped because the build failed no longer reads as a failure. `VerifyResult.ok` stays the overall pass.
 
+- Data contract (orchestrator): `types.ts` now imports `type UIMessage` from `ai` and exports:
+  - `AgentDataParts`, the custom data parts the chat stream writes: `denied: DeniedCall`, `approval: PendingApproval` (`toolCallId`, `tool`, `path`, `diff`, the proposed unified diff), `verify: VerifyResult`, `checkpoint: Checkpoint`, `diff: TurnDiff` (`diff`, `filesTouched`). They reach the UI as `data-denied`, `data-approval`, `data-verify`, `data-checkpoint` and `data-diff` parts.
+  - `AgentMetadata` (`model?`, `turnId?`, `traceId?`).
+  - `AgentMessage = UIMessage<AgentMetadata, AgentDataParts>`.
+  `DeniedCall` gains `toolCallId`. A policy-denied call still goes back to the model as a tool error; the stream also writes a `data-denied` part.
+- Ownership (orchestrator): `workspace/Workspace.tsx` belongs to AI-UI from now on. AI-CORE's last change to it is `12b85c12`; nothing is uncommitted.
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:
