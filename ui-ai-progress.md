@@ -45,7 +45,7 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - `apps/web/src/app/dev/ai/page.tsx`: `/dev/ai`, one section per component, one labelled block per state. It calls `notFound()` in production. Each state shows its raw fixture for now; items 3 to 9 swap in the real component. Code blocks have their borders removed, as the borderless rule requires.
   - `bun run typecheck`: exit 0 on two clean runs (tsbuildinfo removed before the second). `npx react-doctor@latest`: 100/100. No console errors; scrollWidth 1280 at 1280px.
   - Screenshots, checked by eye: `.screenshots/ai-02-fixtures-light.png` and `.screenshots/ai-02-fixtures-dark.png` (full page, every state visible, no borders).
-  - Note: `ProviderId` in types.ts v1 is `'anthropic'` only, while the first provider is OpenAI. Fixtures avoid building a whole `TurnRecord`, so this doesn't block me. AI-CORE will need to widen it.
+  - `ProviderId` now includes `'openai'` (merged from `betterlook` at 0dccdb9a).
 - [x] Conversation and Message, with streaming text and reasoning.
 
   - `components/ai/Conversation.tsx`: `{messages: UIMessage[]; isStreaming: boolean; composer: ReactNode}` on `ChatLayout` and `ChatMessageList`. Astryx handles stick-to-bottom and the scroll-to-latest button; `isStreaming` sets `aria-busy` on the `role="log"` list, so a screen reader announces a finished reply once rather than every token. Checked in the DOM: `aria-busy="true"` while streaming, removed once done.
