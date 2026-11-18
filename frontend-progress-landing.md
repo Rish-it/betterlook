@@ -28,6 +28,9 @@
   Commit: `ea227024` (`build(web): scaffold Next.js app with Astryx and StyleX`).
   Setup follows Astryx `apps/example-nextjs-stylex` (dist CSS + StyleX babel/postcss plugin, Astryx layers before StyleX layers, neutral theme, `LinkProvider` with `next/link`). Root `bun dev` serves port 3100; root `bun run typecheck` runs `tsc --noEmit` in `apps/web`. `agentRules: false` stops `next dev` writing `apps/web/AGENTS.md`. StyleX verified by a throwaway class appearing in emitted CSS.
   Screenshot: `.screenshots/02-scaffold-blank.png`: blank page, theme background (dark, follows system), no borders.
-- [ ] Landing screen at `/`: a short greeting above a centered Composer, with ModelPicker, attach and send in its toolbar, per the contract.
+- [x] Landing screen at `/`: a short greeting above a centered Composer, with ModelPicker, attach and send in its toolbar, per the contract.
+  Commit: `f284d682`. Files: `src/app/page.tsx`, `src/composer/Composer.tsx`, `src/composer/ModelPicker.tsx`, `src/composer/models.ts`.
+  `Composer` = Astryx `ChatComposer` + `ChatComposerInput` (handle `focus()` gives `autoFocus`) with `IconButton` attach and `Selector` ModelPicker in `footerActions`; default `ChatSendButton` disabled while empty (checked). Borderless: `elevation="none"` plus StyleX `xstyle` on the composer body (transparent border, no inset hover/focus rings, `--color-background-muted` fill); keyboard focus outline kept. Astryx has no paperclip icon, so attach uses `upload`. react-doctor 100/100.
+  Screenshots: `.screenshots/03-landing-light.png`, `03-landing-typed-dark.png` (focused, focus ring visible), `03-landing-rest-light.png`, `03-landing-rest-dark.png` (no borders, tone difference only).
 - [ ] Send transition: submitting the Composer navigates to `/workspace?prompt=…&model=…` per the contract. Prove it with a screenshot of the URL after sending (the route itself is FE-B's and may 404 on your branch; that is fine).
 - [ ] Polish: empty, narrow-window (about 400px) and keyboard states of the landing screen look and work right.
