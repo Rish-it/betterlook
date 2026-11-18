@@ -22,7 +22,7 @@ test('a rejected key reaches the chat as a clear message and never leaks provide
   const logged: unknown[][] = [];
   spyOn(console, 'error').mockImplementation((...args: unknown[]) => void logged.push(args));
   const model = new MockLanguageModelV4({doStream: async () => { throw apiError(401); }});
-  const result = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
+  const {result} = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
   const chunks = [];
   for await (const chunk of toUIMessageStream({stream: result.stream, onError: userMessage})) chunks.push(chunk);
   expect(chunks).toContainEqual({type: 'error', errorText: KEY_REJECTED});

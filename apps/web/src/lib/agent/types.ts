@@ -58,7 +58,7 @@ export interface TurnRecord {
   traceId: string;
   sandboxId: string;
   prompt: string;
-  provider: ProviderId;
+  provider: string;
   model: string;
   systemPromptHash: string;
   toolConfigHash: string;

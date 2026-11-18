@@ -55,7 +55,17 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
   - Missing key: `.screenshots/byok-missing-key-1440.png` shows "Sign in or add an API key to start." (`POST /api/chat 401`), sent after the error, so the chat keeps working.
   - The dummy key string appears 0 times in the dev server log. No `.env` exists; the secret-pattern grep over `.screenshots/*.log` and `apps/web/src` found no match.
   - LIVE PROOF PENDING ENV: with AUTH's real `getCredential()` and a valid OpenAI key, a reply streams; with the key removed, "Sign in or add an API key to start." shows; with a revoked key, the rejected message shows.
-- [ ] Turn record and tracing: each turn lands in Langfuse with the required fields; prompt and tool config hashes change on edit; no secret appears in an exported trace.
+- [x] Turn record and tracing: each turn lands in Langfuse with the required fields; prompt and tool config hashes change on edit; no secret appears in an exported trace.
+
+  Built: `lib/agent/trace.ts`, holding `hashOf` (sha256, 16 hex chars), `maskSecrets` (every env value whose name contains KEY/TOKEN/SECRET/PASSWORD, plus `sk-…`, JWT and `Bearer …` patterns), and `MaskingSpanProcessor`, which masks every span attribute and event before any exporter sees it. `setupTelemetry(processor)` registers a `NodeTracerProvider` plus the AI SDK v7 `OpenTelemetry` integration. When `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` are set, `trace.ts` wires `LangfuseSpanProcessor` itself, with the same mask and an export filter covering our `betterlook` spans and gen_ai spans; `flushTraces()` is for the CLI. `runAgent()` now returns `{result, turn}`: it opens a `betterlook.turn` root span, runs `streamText` inside it so the AI SDK spans (`invoke_agent`, `step`, `chat`, tool spans) nest under one trace, and resolves `turn` with a `TurnRecord` on end, abort or error. `trace.id`, `systemPromptHash = hashOf(SYSTEM_PROMPT)`, `toolConfigHash = hashOf(AGENT_CONFIG)` and status go into Langfuse trace metadata, and the masked record is the trace output. `apps/web/.env.example` lists the Langfuse vars, all empty.
+  Fields filled now: trace id, provider/model, both hashes, usage (input, output, cached input), status, timing. Filled by later items: tool calls with allowed/denied and timing (Tools), diff, files touched, checkpoint id, verify, repair (Sandbox, Checkpoint and verify). Cost: `costUsd` stays null, because Langfuse prices the gen_ai spans from model and usage. I did not add a price table.
+  Deps: `@ai-sdk/otel@1.0.176` (v7 moved OpenTelemetry out of `ai`), `@langfuse/otel@6.1.1` (Langfuse span processor), `@opentelemetry/api@1.9.1` (the version `@ai-sdk/otel` pins), `@opentelemetry/sdk-trace-node@2.12.0` (tracer provider with async context), `@opentelemetry/sdk-trace-base@2.12.0` (`SpanProcessor` types, plus `InMemorySpanExporter` in tests; a Langfuse peer).
+  Evidence:
+  - `bun run typecheck` + `bun run test` run 1: pass, run 2: pass (10 tests). `trace.test.ts`: masking of env values, `sk-` keys, Bearer and JWT; the hash changes when the prompt text or any config field changes and is stable for equal config; one mock turn produces a record (hashes, `usage {12, 5, cached 10}`, status `passed`), every exported span shares the record's trace id, and a user key plus an env secret echoed in both prompt and reply appear nowhere in the exported spans (`[REDACTED]` present).
+  - Span tree from one mock turn: `betterlook.turn` root, then `invoke_agent mock-model-id`, `step 1`, `chat mock-model-id`, all children in the same trace. Trace output excerpt: `{"id":"5fbf…","traceId":"ad7fb5d1…","prompt":"make the hero heading blue","provider":"mock-provider","model":"mock-model-id","systemPromptHash":"12ae32cb1ec02d01","toolConfigHash":"010f921decab760a","toolCalls":[],"usage":{"inputTokens":3,"outputTokens":2,"cachedInputTokens":0,"costUsd":null},…,"status":"passed",…}`.
+  - The route still works under Next with telemetry imported: BYOK browser check reran, `[agent] model call failed: 401`, `POST /api/chat 200`, then `401`.
+  - No `.env` exists; the secret grep found no match (above).
+  - LIVE PROOF PENDING ENV: with Langfuse keys and an OpenAI key in `apps/web/.env`, send one message; the Langfuse trace shows `betterlook.turn` with nested model spans, metadata `systemPromptHash`/`toolConfigHash`, the turn record as output, and computed cost. Then edit `system-prompt.ts`, send again, and the `systemPromptHash` differs. Export the trace JSON and grep it for each `.env` value: no match.
 - [ ] Sandbox and preview: a fresh sandbox from a minimal React starter, initialized as a git repo; the preview shows it; reload reconnects to the same sandbox.
 - [ ] Tools and policy: the allowlisted tools work; a call outside the project folder is denied, logged and returned to the model as a tool error; a package.json edit pauses for approval.
 - [ ] Checkpoint and verify: commit per turn, verify after each turn, one repair attempt, failed-turn state, restore works, events logged.
@@ -71,6 +81,8 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 - `0dccdb9a` (orchestrator priority, for AUTH): `ProviderId = 'openai' | 'anthropic'`. OpenAI is the first provider; `anthropic` is reserved for the second.
 
 - Allowed models (orchestrator correction): `apps/web/src/lib/agent/models.ts` exports `MODELS: {id, label, provider}[]` as plain data, safe to import on the client (type-only import of `ProviderId`). OpenAI default first: `gpt-5.5`, then `gpt-5` (both are ids `@ai-sdk/openai@4.0.121` knows; founder can edit the list). `/api/chat` rejects any model not in it (`providerOf` looks it up). AI-UI's picker imports it; `composer/` is untouched.
+
+- Tracing item: `TurnRecord.provider` is now `string`, the AI SDK provider id such as `openai.responses`, instead of `ProviderId`. `runAgent()` returns `{result, turn}`, where `turn` is a `Promise<TurnRecord>`.
 
 ## Questions for the founder
 
@@ -90,5 +102,6 @@ Original questions:
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
 
+- Tracing: a Langfuse trace per turn with nested model spans, hashes in metadata, record as output, cost computed; hash changes after a prompt edit; exported trace JSON has no `.env` value.
 - BYOK: valid key streams; missing key and revoked key show the two messages (needs AUTH's `getCredential()` and a real key).
 - Agent core: streamed reply from a real OpenAI model at `/workspace?model=gpt-5`; Stop aborts the server request.

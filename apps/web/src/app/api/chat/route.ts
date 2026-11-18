@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const credential = parseCredential(body.credential) ?? (await getServerCredential(req));
   if (!credential) return new Response('Sign in or add an API key to start.', {status: 401});
 
-  const result = runAgent({
+  const {result} = runAgent({
     model: languageModel(body.model, credential),
     messages: await convertToModelMessages(body.messages),
     abortSignal: req.signal,
