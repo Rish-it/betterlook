@@ -18,7 +18,13 @@ export function tempProject(files: Record<string, string>, scripted: Scripted = 
   }
   const sh = (cmd: string, args: string[]) => {
     try {
-      return {exitCode: 0, output: execFileSync(cmd, args, {cwd: root, stdio: 'pipe'}).toString()};
+      const env = {...process.env};
+      if (cmd === 'git') {
+        delete env.GIT_DIR;
+        delete env.GIT_WORK_TREE;
+        delete env.GIT_INDEX_FILE;
+      }
+      return {exitCode: 0, output: execFileSync(cmd, args, {cwd: root, stdio: 'pipe', env}).toString()};
     } catch (error) {
       const e = error as {status?: number; stdout?: Buffer; stderr?: Buffer};
       return {exitCode: e.status ?? 1, output: `${e.stdout ?? ''}${e.stderr ?? ''}`};
