@@ -31,7 +31,7 @@ test('streams the model reply with the configured limits', async () => {
   const model = textModel(['Hel', 'lo']);
   const {message, record} = await runTurn({model, messages: [{role: 'user', content: 'hi'}]});
   expect(message.parts.find(p => p.type === 'text')).toMatchObject({text: 'Hello'});
-  expect(message.metadata).toEqual({turnId: record.id, traceId: record.traceId});
+  expect(message.metadata).toEqual({turnId: record.id, traceId: record.traceId, status: 'passed'});
   expect(record.status).toBe('passed');
   const call = model.doStreamCalls[0];
   expect(call.maxOutputTokens).toBe(AGENT_CONFIG.maxOutputTokens);

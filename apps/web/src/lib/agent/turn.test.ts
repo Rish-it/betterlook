@@ -52,7 +52,7 @@ test('a clean turn is committed, verified and streamed as checkpoint, diff and v
   ]);
   expect(calls).toEqual(['npm run --silent typecheck', 'npm run --silent build', 'node /tmp/betterlook/check.mjs http://localhost:5173']);
   expect(chunks.filter(c => c.type.startsWith('data-')).map(c => c.type)).toEqual(['data-checkpoint', 'data-diff', 'data-verify']);
-  expect(chunks.at(-1)).toEqual({type: 'finish'});
+  expect(chunks.at(-1)).toEqual({type: 'finish', messageMetadata: {status: 'passed', notice: undefined}});
 });
 
 test('a failed verify gets exactly one repair attempt with the errors, and passes when the repair works', async () => {
