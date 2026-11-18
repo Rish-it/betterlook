@@ -2,6 +2,19 @@
 
 Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `evals/EVALS.md` (frozen, SHA-256 `36d8f183d42c9b3c35c347fa429774c421fb4e1d3ead0f2b549704ca97949f0f`). `PROBLEM.md` wins on any conflict.
 
+## Hand-off (2026-11-18, founder change of plan)
+
+Items 1–8 are done and committed on `evals-v1`, proven with unit tests and dry runs that call no model, create no sandbox and write nothing to Langfuse. This session stopped before item 9 on the founder's instruction: **no smoke, Haiku or Sonnet run has happened, no Langfuse dataset, experiment, score or annotation queue exists yet, and no result below item 8 is real.** Every benchmark number is still NOT_EVALUATED. README.md belongs to the orchestrator on `betterlook`; this branch does not touch it.
+
+To resume in a new session (from `apps/web` once: `bun install` and `./node_modules/.bin/next typegen`), continue at item 9:
+```
+bun run eval --tasks evals/tasks/v1.md --runs 1 --model claude-haiku-5-5 --tag regression --out .scratch/evals/smoke   # item 9 smoke (narrow it to one task first if quota is tight)
+bun run eval --annotation-queue                                                                                         # item 7: create the E7 queue
+bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5                                               # item 10
+bun run eval --tasks evals/tasks/v1.md --runs 2 --model claude-sonnet-5-5                                              # item 11
+```
+Open points for item 9: (1) the first sandbox rebuilds the base snapshot (the starter and checker changed), which costs extra CPU once; (2) `run.ts` sends `anthropic.fallbacks: 'default'`, which Claude Haiku 5.5 may reject (it has no server-side fallback); if the smoke run returns a 400, that is a harness fix in `run.ts`, not a model substitution; (3) confirm in Linux Chromium that `-webkit-font-smoothing` is reported by `getComputedStyle` (E4f), since only macOS Chromium was checked; (4) check the experiment shows up under `GET /api/public/experiments` with the `langfuse.experiment.*` root-span attributes, and take the experiment URL from Langfuse, not by guessing; (5) `--tag regression` gives 4 tasks; a single-task smoke needs a one-task file or a new `--task` flag.
+
 ## Checklist
 
 - [x] 1. Inventory: read evals/EVALS.md, sample.md, the Vite + React starter, agent:run, verify, existing tracing and package scripts. Write a short map of where each part of the spec plugs in. No edits yet.
@@ -328,5 +341,7 @@ bun test src/lib/evals/report.test.ts → "Trigger C: E8 high hits and new E1/E2
 ```
 
 ## Round log
+
+- Round 1b (2026-11-18): items 2–8 built and proven at unit and dry-run level; ponytail-review on the branch diff (2 duplicates removed). Stopped before item 9 on the founder's change of plan.
 
 - Round 1 (2026-11-18): created this file, item 1 inventory.
