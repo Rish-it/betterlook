@@ -1,5 +1,11 @@
 # FE-A progress: landing screen and app scaffold
 
+## Shared contract additions
+
+- Borderless (founder requirement, every UI item): no visible borders, outlines or divider lines on page, composer, top bar, chat column, message bubbles, preview pane or preview toolbar. Separate regions with spacing and subtle Astryx surface/background token differences (light and dark). Resizable divider shows no line at rest; handle only on hover, drag and keyboard focus. Keyboard focus rings stay visible. Prefer Astryx variants/props that drop borders; otherwise StyleX override through the component's style prop, never global CSS. Checked in every UI screenshot.
+
+## Checklist
+
 - [x] Research: use the agent-reach skill to look at how ChatGPT, Claude and Grok web lay out their landing composer. Write a short component map in the progress file: each part of the landing screen and composer, and the Astryx component for it. Flag anything Astryx doesn't cover.
   Sources (agent-reach: Exa search, Jina reader, gh): ChatGPT teardown https://typenorm.com/articles/chatgpt-ux-teardown ; Grok https://fudge.design/share/grok.com-design ; Claude https://fudge.design/share/claude.ai-design ; Astryx source github.com/meta/astryx `packages/core/src/Chat/ChatComposer.doc.mjs`. Exa rate-limited on the Claude query; Claude detail comes from the Fudge teardown only.
 
@@ -18,7 +24,17 @@
   | Tooltip on icon buttons | `Tooltip` |
 
   Gaps: none blocking. `ChatComposer.onSubmit(value)` gives only text, so `Composer` holds the model in state and calls the contract's `onSubmit(text, model)`. Contract's `autoFocus` has no listed ChatComposer prop; to check at build time (fall back to focusing the input via ref/context).
-- [ ] Scaffold `apps/web` with Next.js + Bun + TypeScript + Astryx + StyleX per Astryx's Next.js guide; `bun dev` shows a blank page and root `bun run typecheck` passes. Commit as soon as it passes and write the commit hash under the item: FE-B is waiting on it.
-- [ ] Landing screen at `/`: a short greeting above a centered Composer, with ModelPicker, attach and send in its toolbar, per the contract.
-- [ ] Send transition: submitting the Composer navigates to `/workspace?prompt=…&model=…` per the contract. Prove it with a screenshot of the URL after sending (the route itself is FE-B's and may 404 on your branch; that is fine).
+- [x] Scaffold `apps/web` with Next.js + Bun + TypeScript + Astryx + StyleX per Astryx's Next.js guide; `bun dev` shows a blank page and root `bun run typecheck` passes. Commit as soon as it passes and write the commit hash under the item: FE-B is waiting on it.
+  Commit: `ea227024` (`build(web): scaffold Next.js app with Astryx and StyleX`).
+  Setup follows Astryx `apps/example-nextjs-stylex` (dist CSS + StyleX babel/postcss plugin, Astryx layers before StyleX layers, neutral theme, `LinkProvider` with `next/link`). Root `bun dev` serves port 3100; root `bun run typecheck` runs `tsc --noEmit` in `apps/web`. `agentRules: false` stops `next dev` writing `apps/web/AGENTS.md`. StyleX verified by a throwaway class appearing in emitted CSS.
+  Screenshot: `.screenshots/02-scaffold-blank.png`: blank page, theme background (dark, follows system), no borders.
+- [x] Landing screen at `/`: a short greeting above a centered Composer, with ModelPicker, attach and send in its toolbar, per the contract.
+  Commit: `f284d682`. Files: `src/app/page.tsx`, `src/composer/Composer.tsx`, `src/composer/ModelPicker.tsx`, `src/composer/models.ts`.
+  `Composer` = Astryx `ChatComposer` + `ChatComposerInput` (handle `focus()` gives `autoFocus`) with `IconButton` attach and `Selector` ModelPicker in `footerActions`; default `ChatSendButton` disabled while empty (checked). Borderless: `elevation="none"` plus StyleX `xstyle` on the composer body (transparent border, no inset hover/focus rings, `--color-background-muted` fill); keyboard focus outline kept. Astryx has no paperclip icon, so attach uses `upload`. react-doctor 100/100.
+  Screenshots: `.screenshots/03-landing-light.png`, `03-landing-typed-dark.png` (focused, focus ring visible), `03-landing-rest-light.png`, `03-landing-rest-dark.png` (no borders, tone difference only).
+- [x] Send transition: submitting the Composer navigates to `/workspace?prompt=…&model=…` per the contract. Prove it with a screenshot of the URL after sending (the route itself is FE-B's and may 404 on your branch; that is fine).
+  Commit: `0a195121`. `page.tsx` pushes `/workspace?${new URLSearchParams({prompt, model})}` via `next/navigation`.
+  Checked in Chrome: Shift+Enter adds a newline without sending; Enter sends `"Make the header blue\nand bold"` with `model=gpt-5` after picking GPT-5; clicking Send carries `&`, `%` and `?` intact (`URLSearchParams` encoding).
+  Screenshots: `.screenshots/04-send-enter-url.png`, `.screenshots/04-send-click-url.png` (URL banner injected for the shot; `/workspace` 404s on this branch as expected).
 - [ ] Polish: empty, narrow-window (about 400px) and keyboard states of the landing screen look and work right.
+  Orchestrator review of f284d682: focused composer must not show a ring around the whole box. Show input focus by a slight background tone lift on the composer instead. Keep focus-visible rings on attach, model picker and send. Screenshot both themes.
