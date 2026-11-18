@@ -2,7 +2,7 @@
 import {afterEach, expect, spyOn, test} from 'bun:test';
 import {APICallError} from 'ai';
 import {MockLanguageModelV4} from 'ai/test';
-import {KEY_REJECTED, PROVIDER_FAILED, userMessage} from './errors';
+import {KEY_REJECTED, missingKey, PROVIDER_FAILED, RATE_LIMITED, userMessage} from './errors';
 import {runTurn} from './test-project';
 
 const FAKE_KEY_ECHO = 'Incorrect API key provided: fake-***-4321';
@@ -14,8 +14,15 @@ afterEach(() => spyOn(console, 'error').mockRestore());
 test('maps provider errors to fixed user messages', () => {
   expect(userMessage(apiError(401))).toBe(KEY_REJECTED);
   expect(userMessage(apiError(403))).toBe(KEY_REJECTED);
+  expect(userMessage(apiError(429))).toBe(RATE_LIMITED);
   expect(userMessage(apiError(500))).toBe(PROVIDER_FAILED);
+  expect(userMessage(apiError(529))).toBe(PROVIDER_FAILED);
   expect(userMessage(new Error(FAKE_KEY_ECHO))).toBe(PROVIDER_FAILED);
+});
+
+test('the missing-key message names the provider the model needs', () => {
+  expect(missingKey({provider: 'anthropic', label: 'Claude Sonnet 5.5'})).toBe('Add an Anthropic API key to use Claude Sonnet 5.5.');
+  expect(missingKey({provider: 'openai', label: 'GPT-5'})).toBe('Sign in or add an OpenAI API key to use GPT-5.');
 });
 
 test('a rejected key reaches the chat as a clear message and never leaks provider text', async () => {

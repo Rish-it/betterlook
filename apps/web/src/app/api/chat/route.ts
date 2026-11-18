@@ -1,5 +1,7 @@
 import {convertToModelMessages, createUIMessageStreamResponse} from 'ai';
-import {languageModel, parseCredential, providerOf} from '@/lib/agent/model';
+import {missingKey} from '@/lib/agent/errors';
+import {languageModel, parseCredential} from '@/lib/agent/model';
+import {MODELS} from '@/lib/agent/models';
 import {runAgent} from '@/lib/agent/run';
 import type {AgentMessage} from '@/lib/agent/types';
 import {getServerCredential} from '@/lib/auth/server';
@@ -8,9 +10,11 @@ import {openProject, sandboxConfigured} from '@/lib/sandbox/sandbox';
 
 export async function POST(req: Request) {
   const body: {messages: AgentMessage[]; model: string; credential: unknown; sandboxId?: string | null} = await req.json();
-  if (!providerOf(body.model)) return new Response(`${body.model} is not connected yet.`, {status: 400});
-  const credential = parseCredential(body.credential) ?? (await getServerCredential(req));
-  if (!credential) return new Response('Sign in or add an API key to start.', {status: 401});
+  const model = MODELS.find(m => m.id === body.model);
+  if (!model) return new Response(`${body.model} is not connected yet.`, {status: 400});
+  const bodyCredential = parseCredential(body.credential);
+  const credential = bodyCredential?.provider === model.provider ? bodyCredential : model.provider === 'openai' ? await getServerCredential(req) : null;
+  if (!credential) return new Response(missingKey(model), {status: 401});
 
   let project: Project | undefined;
   if (body.sandboxId && sandboxConfigured()) {

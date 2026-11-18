@@ -3,8 +3,8 @@ import {expect, test} from 'bun:test';
 import {simulateReadableStream} from 'ai';
 import {MockLanguageModelV4} from 'ai/test';
 import {AGENT_CONFIG} from './config';
-import {languageModel, parseCredential, providerOf} from './model';
-import {MODELS} from './models';
+import {languageModel, parseCredential} from './model';
+import {MODELS, providerOf} from './models';
 import {runTurn} from './test-project';
 
 const usage = {
@@ -35,7 +35,9 @@ test('streams the model reply with the configured limits', async () => {
   expect(record.status).toBe('passed');
   const call = model.doStreamCalls[0];
   expect(call.maxOutputTokens).toBe(AGENT_CONFIG.maxOutputTokens);
-  expect(call.providerOptions).toEqual({openai: {store: false}});
+  expect(call.providerOptions).toEqual({openai: {store: false}, anthropic: {fallbacks: 'default'}});
+  expect(call.temperature).toBeUndefined();
+  expect(call.toolChoice).toEqual({type: 'auto'});
 });
 
 test('stops streaming when aborted', async () => {
@@ -53,19 +55,24 @@ test('stops streaming when aborted', async () => {
 });
 
 test('routes models to their provider and rejects mismatches', () => {
-  expect(providerOf(MODELS[0].id)).toBe('openai');
+  expect(MODELS[0]).toEqual({id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', provider: 'anthropic'});
+  expect(providerOf('gpt-5')).toBe('openai');
   expect(providerOf('gpt-unlisted')).toBeNull();
-  expect(providerOf('claude-sonnet-5-5')).toBeNull();
   const model = languageModel('gpt-5', {provider: 'openai', kind: 'api-key', apiKey: 'test'});
   expect(typeof model === 'object' && model.provider).toStartWith('openai');
+  const claude = languageModel('claude-sonnet-5-5', {provider: 'anthropic', kind: 'api-key', apiKey: 'test'});
+  expect(typeof claude === 'object' && [claude.provider, claude.modelId]).toEqual(['anthropic.messages', 'claude-sonnet-5-5']);
   expect(() => languageModel('claude-sonnet-5-5', {provider: 'openai', kind: 'api-key', apiKey: 'test'})).toThrow();
+  expect(() => languageModel('claude-sonnet-5-5', {provider: 'anthropic', kind: 'oauth', accessToken: 'test'})).toThrow();
 });
 
 test('accepts only well-formed credentials', () => {
   expect(parseCredential({provider: 'openai', kind: 'api-key', apiKey: 'k'})).toEqual({provider: 'openai', kind: 'api-key', apiKey: 'k'});
   expect(parseCredential({provider: 'openai', kind: 'oauth', accessToken: 't', expiresAt: 1})).toBeNull();
   expect(parseCredential({provider: 'openai', kind: 'api-key', apiKey: ''})).toBeNull();
-  expect(parseCredential({provider: 'anthropic', kind: 'api-key', apiKey: 'k'})).toBeNull();
+  expect(parseCredential({provider: 'anthropic', kind: 'api-key', apiKey: 'k'})).toEqual({provider: 'anthropic', kind: 'api-key', apiKey: 'k'});
+  expect(parseCredential({provider: 'anthropic', kind: 'oauth', accessToken: 't'})).toBeNull();
+  expect(parseCredential({provider: 'google', kind: 'api-key', apiKey: 'k'})).toBeNull();
   expect(parseCredential(null)).toBeNull();
 });
 

@@ -15,7 +15,7 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, SANDBOX_FAILED, STEP_LIMIT, userMessage, VERIFY_FAILED} from './errors';
+import {errorStatus, REFUSED, SANDBOX_FAILED, STEP_LIMIT, userMessage, VERIFY_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
@@ -147,8 +147,10 @@ export function runAgent({
             messages: callMessages,
             stopWhen: isStepCount(AGENT_CONFIG.maxSteps),
             maxOutputTokens: AGENT_CONFIG.maxOutputTokens,
+            // Claude Sonnet 5.5 400s on non-default sampling, forced toolChoice and disabled thinking, so none are set.
             providerOptions: {
               openai: {store: false, ...(AGENT_CONFIG.promptCachePerProject && project ? {promptCacheKey: project.id} : {})},
+              anthropic: {fallbacks: 'default'},
             },
             tools: project ? createTools(project, record.toolCalls) : undefined,
             toolApproval: async ({toolCall}) => {
@@ -190,6 +192,10 @@ export function runAgent({
       const settled = (outcome: Outcome) => {
         if (outcome.type === 'end') {
           addUsage(record.usage, outcome.event.totalUsage);
+          if (outcome.event.finishReason === 'content-filter') {
+            end({status: 'error', error: REFUSED});
+            return false;
+          }
           if (outcome.event.steps.length >= AGENT_CONFIG.maxSteps && outcome.event.finishReason === 'tool-calls') record.stepLimitReached = true;
           return true;
         }

@@ -27,6 +27,7 @@ test('masks env secrets and key patterns', () => {
   const env = {OPENAI_EVAL_API_KEY: 'abcdefgh12345', LANGFUSE_BASE_URL: 'https://cloud.langfuse.com'};
   expect(maskSecrets('key abcdefgh12345 at https://cloud.langfuse.com', env)).toBe('key [REDACTED] at https://cloud.langfuse.com');
   expect(maskSecrets(`use ${USER_KEY} or Bearer abc.def`, {})).toBe('use [REDACTED] or [REDACTED]');
+  expect(maskSecrets('anthropic sk-ant-api03-fakefakefake_0123-xyz end', {})).toBe('anthropic [REDACTED] end');
   expect(maskSecrets('jwt eyJhbGciOiJIUzI1.eyJzdWIiOiIx.c2lnbmF0dXJl', {})).toBe('jwt [REDACTED]');
 });
 
