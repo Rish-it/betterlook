@@ -2,6 +2,7 @@ import {mkdir, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import type {LanguageModel} from 'ai';
+import {parseExpectation} from '../evals/checks';
 import type {Project} from '../sandbox/project';
 import {CHECKER_DIR, CHECKER_SCRIPT} from '../sandbox/runtime-check';
 import {PREVIEW_PORT} from '../sandbox/starter';
@@ -37,7 +38,11 @@ export function parseTasks(value: unknown): Task[] {
 
 const STARTERS = ['default'];
 
-// The founder's Markdown task format: one "## <task id>" section per task with "prompt:", "starter:" and "notes:" lines.
+const EVAL_IDS = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8'];
+const commaList = (value: string) => value.split(',').map(v => v.trim()).filter(Boolean);
+
+// The founder's Markdown task format: one "## <task id>" section per task with "prompt:", "starter:" and "notes:" lines,
+// plus the EVALS.md §9 fields "expect:" (one JSON assertion per "- " line), "allowed_files:", "tags:", "applies:" and "target:".
 // Notes are for the founder and never reach the runner; anything before the first heading is ignored.
 export function parseTaskMarkdown(text: string): Task[] {
   const sections = text.split(/^## +/m).slice(1);
@@ -51,7 +56,32 @@ export function parseTaskMarkdown(text: string): Task[] {
       if (!prompt) throw new Error(`Task ${id} needs a prompt.`);
       const starter = field('starter') || 'default';
       if (!STARTERS.includes(starter)) throw new Error(`Task ${id} uses starter "${starter}"; available: ${STARTERS.join(', ')}.`);
-      return {id, prompt, starter};
+      const task: Task = {id, prompt, starter};
+      const at = lines.findIndex(l => l.trim() === 'expect:');
+      if (at >= 0) {
+        const items = lines.slice(at + 1).filter((l, i, all) => all.slice(0, i + 1).every(x => x.startsWith('- ')));
+        if (!items.length) throw new Error(`Task ${id} has an empty expect: list.`);
+        task.expect = items.map(line => {
+          try {
+            return parseExpectation(JSON.parse(line.slice(2)));
+          } catch (error) {
+            throw new Error(`Task ${id} has an invalid expectation ${line.slice(2)}: ${(error as Error).message}`);
+          }
+        });
+      }
+      const allowed = field('allowed_files');
+      if (allowed !== undefined) task.allowed_files = commaList(allowed);
+      const tags = field('tags');
+      if (tags !== undefined) task.tags = commaList(tags);
+      const applies = field('applies');
+      if (applies !== undefined) {
+        task.applies = commaList(applies);
+        const unknown = (task.applies as string[]).filter(e => !EVAL_IDS.includes(e));
+        if (unknown.length) throw new Error(`Task ${id} applies unknown evals: ${unknown.join(', ')}.`);
+      }
+      const target = field('target');
+      if (target !== undefined) task.target = target;
+      return task;
     }),
   );
 }

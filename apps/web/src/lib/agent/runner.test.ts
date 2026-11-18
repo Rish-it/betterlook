@@ -207,3 +207,34 @@ test('the preview screenshot comes from the checker inside the sandbox and retri
   expect(await previewScreenshot(t.project, async ms => void waits.push(ms))).toEqual(new Uint8Array([9]));
   expect([tries, waits]).toEqual([3, [3_000, 3_000]]);
 });
+
+test('the Markdown reader parses the EVALS.md §9 fields and rejects malformed expectations', () => {
+  const md = [
+    '## copy-edit',
+    'prompt: Change the heading.',
+    'target: h2',
+    'expect:',
+    '- {"type": "text", "selector": "h2", "equals": "What you get"}',
+    '- {"type": "count", "selector": ".plan", "min": 1}',
+    'allowed_files: src/**, index.html',
+    'tags: regression',
+    'applies: E1, E2, E7',
+    'notes: for the founder',
+  ].join('\n');
+  expect(parseTaskMarkdown(md)).toEqual([
+    {
+      id: 'copy-edit',
+      prompt: 'Change the heading.',
+      starter: 'default',
+      target: 'h2',
+      expect: [{type: 'text', selector: 'h2', equals: 'What you get'}, {type: 'count', selector: '.plan', min: 1}],
+      allowed_files: ['src/**', 'index.html'],
+      tags: ['regression'],
+      applies: ['E1', 'E2', 'E7'],
+    },
+  ]);
+  expect(() => parseTaskMarkdown('## a\nprompt: p\nexpect:\n- {"type": "hover", "selector": "a"}\n')).toThrow('Task a has an invalid expectation');
+  expect(() => parseTaskMarkdown('## a\nprompt: p\nexpect:\n- {not json}\n')).toThrow('Task a has an invalid expectation');
+  expect(() => parseTaskMarkdown('## a\nprompt: p\nexpect:\nnotes: x\n')).toThrow('Task a has an empty expect: list.');
+  expect(() => parseTaskMarkdown('## a\nprompt: p\napplies: E1, E9\n')).toThrow('Task a applies unknown evals: E9.');
+});
