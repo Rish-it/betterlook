@@ -1,0 +1,71 @@
+# Evals progress
+
+Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `evals/EVALS.md` (frozen, SHA-256 `36d8f183d42c9b3c35c347fa429774c421fb4e1d3ead0f2b549704ca97949f0f`). `PROBLEM.md` wins on any conflict.
+
+## Checklist
+
+- [x] 1. Inventory: read evals/EVALS.md, sample.md, the Vite + React starter, agent:run, verify, existing tracing and package scripts. Write a short map of where each part of the spec plugs in. No edits yet.
+- [x] 2. Starter: update it to Section 0 (Geist Sans, Geist Mono and Geist Pixel Square faces actually loaded, [data-section="hero"] with h1, one-line intro and primary button, keyword spans, monochrome, borderless, typography, geometry, press motion, html background), add DESIGN.md, and wire DESIGN.md into the agent's context. The starter itself must pass E2–E4 on its own.
+- [ ] 3. Check library: one shared TypeScript library for E1–E8 per the spec, with PASS / FAIL / NOT_EVALUATED / NOT_APPLICABLE, one-line evidence-based reasons, E4 subrules E4a–E4k, E8 severities, and the metadata fields the scoring contract lists. Unit tests on the spec's positive and negative fixtures for every eval, plus boundary cases for every threshold.
+- [ ] 4. Task file: write evals/tasks/v1.md with exactly the 12 tasks in Section 9, in sample.md's syntax, with selectors confirmed against the actual starter and exactly 4 tagged regression. Show me the complete file in this progress log, then continue without waiting. Freeze it and record its SHA-256 as the taskset hash.
+- [ ] 5. Trigger A: post-turn checks inside verify, reusing its browser session, scores attached to the turn's Langfuse trace, added_verify_ms measured, and the 5% asynchronous E7 judge sample enqueued without blocking.
+- [ ] 6. Trigger B: bun run eval --tasks --runs --model on top of agent:run, with a fresh isolated starter per task and trial, the Langfuse dataset created or updated from the frozen tasks, one experiment per model, trace-linked BOOLEAN scores, config SHA-256, all the per-run fields Section 11 lists, concurrency capped at 3 sandboxes, backoff on rate limits, and nonzero exit on any E8 high-severity hit. Sanitize records and scan them for secret or canary matches before publishing.
+- [ ] 7. E7: the deterministic pre-check, plus the verbatim judge instruction from the spec (OpenAI model if OPENAI_EVAL_API_KEY exists, otherwise claude-haiku-5-5 with same_family: true), storing the exact instruction, resolved model ID and SHA-256. Create the Langfuse annotation queue "E7 honesty — 20-run calibration" with PASS/FAIL and a required note.
+- [ ] 8. Trigger C: the GitHub Action per Section 10C (regression tag only, runs 1, code checks only, nonfork PRs, repository secrets, explicit spend cap, comparison against a main baseline, NOT_EVALUATED if that baseline is missing). Don't push or create anything on GitHub; commit the workflow file only.
+- [ ] 9. Preflight: typecheck, all unit tests, and a browser check of the starter pass. Model IDs confirmed. Sandbox and Langfuse credentials work. One smoke run (one task, one trial, Haiku) completes end to end with all applicable evals scored and the published record clean of secrets and canaries. Record the sandbox CPU it used, project the CPU for 84 runs, and note the risk against our Vercel Hobby quota.
+- [ ] 10. Haiku run: bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5. That's 60 task executions; record executed/expected and every skip or error with its reason.
+- [ ] 11. Sonnet run: bun run eval --tasks evals/tasks/v1.md --runs 2 --model claude-sonnet-5-5. That's 24 task executions, same tasks and same starter snapshot, never reusing prior edits or results.
+- [ ] 12. Scoring and exports: compute everything in Section 11 per model and per eval (pass@1, pass^5 for Haiku, pass^2 for Sonnet, PASS/FAIL/NOT_EVALUATED/NOT_APPLICABLE counts with visible denominators). Export 20 distinct real E7 records for blind independent review (request, final message, redacted diff, verify outcome, sanitized trace reference, no judge verdict, human_label blank). Pick three real failing traces and write one evidence-grounded paragraph each: what to fix first, why it targets the observed failure, and the regression check to add. If fewer than three failures exist, report the actual count.
+
+## Facts recorded
+
+- `evals/tasks/sample.md` was absent when this branch was cut, and this worker must not create it. Its record syntax is the one `EVALS.md` §9 describes and `parseTaskMarkdown` in `apps/web/src/lib/agent/runner.ts` implements (`## <task id>`, `prompt:`, `starter:`, `notes:`).
+- `README.md` did not exist at the repo root; this branch creates it with only an "Evals" section.
+- `OPENAI_EVAL_API_KEY` is not set in `apps/web/.env` (checked by variable name only), so the E7 judge uses `claude-haiku-5-5` with `same_family: true`.
+- `system-prompt.ts` is empty (founder-owned). The baseline runs with an empty system prompt plus DESIGN.md as project context.
+- `next-env.d.ts` is generated and gitignored; `bun run typecheck` needs `next typegen` once in a fresh worktree (otherwise `AuthControls.tsx` fails on its `.svg` import).
+
+## Item 1: inventory and map
+
+Read: `evals/EVALS.md`, `PROBLEM.md`, `ai-core-progress.md`, `apps/web/{package.json,scripts/agent-run.ts}`, `lib/agent/{run,runner,verify,trace,tools,policy,config,models,model,types,checkpoint,system-prompt,test-project}.ts`, `lib/sandbox/{sandbox,starter,project,runtime-check}.ts`. Installed and reused: `ai` 7.0.176, `@ai-sdk/anthropic`, `@langfuse/otel` 6.1.1 (OTel span processor; experiment attributes `langfuse.experiment.*` come from its `@langfuse/core`), `@vercel/sandbox` 4.0.0. Langfuse public API checked against `cloud.langfuse.com/generated/api/openapi.yml`: `POST /api/public/scores` (BOOLEAN 1/0, `metadata`), `POST /api/public/v2/datasets`, `POST /api/public/dataset-items` (upsert by `id`), `POST /api/public/score-configs`, `POST /api/public/annotation-queues`, `GET /api/public/experiments`, `GET /api/public/projects`. Experiments have no create endpoint; they come from `langfuse.experiment.*` span attributes on the trace.
+
+| Spec part | Plugs into | Notes |
+|---|---|---|
+| §0 starter + DESIGN.md | `lib/sandbox/starter.ts` `STARTER_FILES` | Changing it changes `BASE_NAME`, so the first sandbox rebuilds the base snapshot once. Fonts: the `geist` package's woff2 files through a Vite alias (`geist` has `next` as a peer dep, so the starter adds `.npmrc` `legacy-peer-deps=true`). |
+| DESIGN.md as context | `lib/agent/run.ts` | Read from the project root at turn start; sent as the first message after tools and system (the cached prefix). Absent file = nothing sent. |
+| E1–E8 scoring | new `lib/evals/checks.ts` | Pure functions over recorded evidence: page snapshot, diff, tool calls, verify, final message. Unit-tested on synthetic fixtures. |
+| Page evidence (E1, E2 hero, E3, E4) | new `lib/evals/collect.ts`, run by the sandbox checker | `runtime-check.ts` `CHECKER_SOURCE` gains an optional hook module path, so the same Chromium page that verify already loads runs the collector (Trigger A reuses verify's browser session). |
+| E2 pixel diff | `pixelmatch` + `pngjs` (new devDeps) in the CLI | Spec names pixelmatch; PNG decode isn't in Bun or the platform. Only Trigger B needs it (§10A runs E2 file scope only). |
+| E5 | `checks.ts` | Path timeline from `git ls-tree` of the turn's parent commit + tool calls; CSS vars, font families and imports from post-turn source; typecheck/build output from verify. |
+| E6 | `checks.ts` | Pure over `TurnRecord.toolCalls`. |
+| E7 pre-check | `checks.ts` | Needs the final assistant message: `TurnRecord` gains `finalMessage`. |
+| E7 judge | new `lib/evals/judge.ts` | AI SDK `generateText`, verbatim instruction, SHA-256, resolved model id. |
+| E8 | `checks.ts` + CLI | Canary planted by the CLI before the turn, registered with `trace.ts` masking so traces, run files and judge inputs never carry it. |
+| Trigger A | `verify.ts` + `run.ts` | Scores posted to the turn's trace (fire-and-forget); 5% E7 judge sample async. Nothing reaches the designer's UI stream. |
+| Trigger B | new `scripts/eval.ts` on `runner.ts` `runTasks` | `runner.ts` gains a task-aware `capture` and an `evaluate` hook; concurrency cap 3 and rate-limit backoff are reused as is. |
+| Task syntax | `runner.ts` `parseTaskMarkdown` | Extended with `expect:`, `allowed_files:`, `tags:`, `applies:` and `target:` (E2's "target bounding box" input). Unsupported or malformed expectations fail the parse. |
+| Trigger C | new `.github/workflows/evals.yml` | Regression tag, runs 1, `--no-judge`, `--max-usd`, main baseline artifact. |
+| Langfuse | new `lib/evals/langfuse.ts` | `fetch` with basic auth; no new client dependency. |
+
+Proof: `shasum -a 256 evals/EVALS.md` → `36d8f183…9f0f` (unchanged). `bun run typecheck` (after `next typegen`) and `bun test` → 97 pass, 0 fail.
+
+## Item 2: starter and DESIGN.md context
+
+- `lib/sandbox/starter.ts`: hero (`[data-section="hero"]` > `h1` in Geist Pixel Square, one-line Sans intro, primary `button`), features, pricing (nested `plan` 16px radius / 8px inset / `plan-inner` 8px radius), footer. Keyword spans: `Betterlook`, `Beta` (Pixel); `CLI`, `API`, `npm`, `v1` (Mono). Faces from the `geist` package via the `@geist-fonts` Vite alias, `font-display: block`. Grays only, no borders, 1px rings at ≤ 0.08 alpha, balance/pretty, −0.02em on ≥ 24px text, `antialiased` and `tabular-nums` on `html`, 0.97 press over a 120ms transform-only transition, none under reduced motion, `#fafafa` html background.
+- `DESIGN.md` in the starter is Section 0 of `EVALS.md` verbatim (`starter.test.ts` compares them).
+- `lib/agent/run.ts`: reads `DESIGN.md` from the project root at turn start and sends it as `<project_file path="DESIGN.md">…</project_file>` before the conversation, after tools and system. `TurnRecord` gains `projectContextHash` and `finalMessage` (the last model call's final text, needed by E7).
+
+Proof (local Chromium 1254 headless shell, Playwright 1.58.0, starter served by Vite):
+```
+node check.mjs http://localhost:5179 '' hook.mjs   →  []   (no runtime errors)
+hero: PASS — Hero has one h1, a one-line intro and a button, in order.
+E3: PASS — 27 text segments use the right faces and every used face loaded.
+E4: PASS — All applicable visual-system subrules pass.   (E4a–E4k all PASS; E4h 4 nested corners)
+```
+Negative control on the same page (blue CTA, 2px ring, `h2` without balance, Mono body copy, 18px bordered icon button): E3 FAIL, E4a/E4b/E4c/E4d/E4j/E4k FAIL, as expected; reverted.
+Starter `npm run typecheck` OK, `npm run build` OK (all three woff2 bundled). `npx react-doctor@latest .` on the starter: 100/100, no issues.
+`bun test` ×2: 101 pass, 0 fail. `bun run typecheck` ×2: clean.
+
+## Round log
+
+- Round 1 (2026-11-18): created this file, item 1 inventory.
