@@ -466,6 +466,18 @@ node .scratch/evals/security-scan.mjs
 ```
 Stopped as instructed after the code/test commit and this evidence record. Item 9 stays unchecked. No reset or live createProject reproduction occurs before the orchestrator sends the founder's approval and instructs continuation; an approved retry must capture the full sanitized exception chain if setup fails again. The original exact throw/input cannot be recovered from the evidence retained so far.
 
+### Item 9 continuation: explicitly approved base deletion
+
+The orchestrator relays founder approval to delete exactly `betterlook-starter-1eeff41a8ee2`. Immediately before deletion the SDK re-reads that exact base with `resume: false`, verifies `name` and `status: stopped`, and lists its snapshots: **0**. The only delete call is `sandbox.delete({deleteOrphanSnapshots: false})` on that instance; no other Vercel resource is deleted or changed by the reset script.
+```
+bun build .scratch/evals/delete-approved-base.ts --target=node --packages=external --outfile=apps/web/node_modules/.cache/delete-approved-base.mjs
+node --env-file=apps/web/.env apps/web/node_modules/.cache/delete-approved-base.mjs
+  timestamp=2026-11-18T18:29:41.501Z
+  name=betterlook-starter-1eeff41a8ee2 status=stopped snapshots=0 delete_orphan_snapshots=false
+  deleted=true; verification: GET returns HTTP 404
+```
+The original 8,895 ms failed setup CPU remains separate from the new rebuild and all task CPU. Fresh preflight and the one-task smoke follow; item 9 is not ticked merely for this reset.
+
 ## Item 10: Haiku (NOT_EVALUATED)
 
 Not started because item 9 is incomplete. Executed/expected **0/60**; 60 unstarted executions, zero executed task errors. All applicable scores are NOT_EVALUATED for sandbox setup; no alternative model was used. Planned command remains `bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5`.
