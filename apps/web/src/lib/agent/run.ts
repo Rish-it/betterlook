@@ -84,11 +84,13 @@ export function runAgent({
   messages,
   project,
   abortSignal,
+  keepSandbox = false,
 }: {
   model: Exclude<LanguageModel, string>;
   messages: ModelMessage[];
   project?: Project;
   abortSignal?: AbortSignal;
+  keepSandbox?: boolean;
 }) {
   const span = trace.getTracer(TRACER_NAME).startSpan('betterlook.turn');
   const spanContext = trace.setSpan(context.active(), span);
@@ -111,6 +113,7 @@ export function runAgent({
     stepLimitReached: false,
     status: 'running',
     checkpoint: null,
+    sandbox: null,
     startedAt: new Date().toISOString(),
     endedAt: null,
   };
@@ -124,8 +127,8 @@ export function runAgent({
 
   let resolveTurn: (turn: TurnRecord) => void;
   const turn = new Promise<TurnRecord>(resolve => (resolveTurn = resolve));
-  const end = (patch: Partial<TurnRecord>) => {
-    Object.assign(record, patch, {endedAt: new Date().toISOString()});
+  const end = (patch: Partial<TurnRecord>) => void Object.assign(record, patch, {endedAt: new Date().toISOString()});
+  const finalize = () => {
     span.setAttributes({
       'langfuse.trace.output': JSON.stringify(record),
       'langfuse.trace.metadata.status': record.status,
@@ -253,6 +256,9 @@ export function runAgent({
         writer.write({type: 'error', errorText: SANDBOX_FAILED});
       } finally {
         writer.write({type: 'finish', messageMetadata: {status: record.status, notice: noticeFor(record)}});
+        // Stopped as soon as the turn ends, so the Hobby CPU quota is not spent idling until the timeout.
+        if (project?.stop && !keepSandbox) record.sandbox = await project.stop().catch(() => null);
+        finalize();
       }
     },
     onError: userMessage,

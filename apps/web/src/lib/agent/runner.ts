@@ -58,7 +58,7 @@ async function runOnce(task: Task, run: number, outDir: string, deps: Required<D
   for (let attempt = 1; ; attempt++) {
     const project = await deps.project();
     const before = await deps.capture(project);
-    const {stream, turn} = runAgent({model: deps.model(), messages: [{role: 'user', content: task.prompt}], project});
+    const {stream, turn} = runAgent({model: deps.model(), messages: [{role: 'user', content: task.prompt}], project, keepSandbox: true});
     for await (const _ of stream);
     const record = await turn;
     if (record.error === RATE_LIMITED && attempt < RUNNER_CONFIG.maxAttempts) {

@@ -82,6 +82,20 @@ test('sandbox down mid-turn: a readable message and a finished stream', async ()
   await expectChatStillWorks();
 });
 
+test('the sandbox stops as soon as the turn ends and the turn records what it used', async () => {
+  const usage = {vcpus: 2, activeCpuMs: 3100, durationMs: 45_000};
+  const ask1 = async (keepSandbox: boolean, model: MockLanguageModelV4) => {
+    let stops = 0;
+    const p = {...project().project, stop: async () => (stops++, usage)};
+    const {record} = await runTurn({model, messages: ask(), project: p, keepSandbox});
+    return {record, stops};
+  };
+  const edited = () => new MockLanguageModelV4({doStream: [toolStep([['e1', 'edit_file', {path: 'src/App.tsx', oldString: 'Hi', newString: 'Hello'}]]), textStep('Done.')]});
+  expect(await ask1(false, edited())).toMatchObject({record: {status: 'passed', sandbox: usage}, stops: 1});
+  expect(await ask1(false, failing(500))).toMatchObject({record: {status: 'error', sandbox: usage}, stops: 1});
+  expect(await ask1(true, edited())).toMatchObject({record: {status: 'passed', sandbox: null}, stops: 0});
+});
+
 test('sandbox down before the turn: /api/chat answers with a readable 503', async () => {
   const saved = {...process.env};
   Object.assign(process.env, {VERCEL_TOKEN: 'fake-token', VERCEL_TEAM_ID: 'team_x', VERCEL_PROJECT_ID: 'prj_x'});

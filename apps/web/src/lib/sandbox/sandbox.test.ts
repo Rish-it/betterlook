@@ -107,6 +107,13 @@ test('reconnecting resumes the same sandbox and restarts the preview server', as
   expect(calls).toEqual(['get sbx-test resume=true', 'npm run dev &']);
 });
 
+test('stopping a project reports the vCPUs, active CPU and duration the SDK returns', async () => {
+  const {api, calls} = fakeApi();
+  const project = await openProject('sbx-test', api);
+  expect(await project.stop!()).toEqual({vcpus: 2, activeCpuMs: 4200, durationMs: 60_000});
+  expect(calls.at(-1)).toBe('stop');
+});
+
 test('a turn on a session close to its timeout gets the full turn timeout back', async () => {
   const {api, calls} = fakeApi({expiresInMs: 2 * 60_000});
   await openProject('sbx-test', api);

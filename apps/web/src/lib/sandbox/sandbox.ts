@@ -93,6 +93,18 @@ async function newSandbox(api: SandboxApi, persistent: boolean) {
   return sandbox;
 }
 
+const withStop = (sandbox: Sandbox): Project => ({
+  ...sandboxProject(sandbox, sandbox.cwd),
+  stop: async () => {
+    const session = await sandbox.stop();
+    return {
+      vcpus: session.vcpus,
+      activeCpuMs: session.activeCpuDurationMs ?? null,
+      durationMs: session.startedAt ? (session.stoppedAt ?? Date.now()) - session.startedAt : null,
+    };
+  },
+});
+
 export async function createSandbox(api?: SandboxApi): Promise<SandboxInfo> {
   return info(await newSandbox(api ?? (await vercelSandbox()), true));
 }
@@ -108,5 +120,5 @@ export async function openProject(sandboxId: string, api?: SandboxApi): Promise<
   const sandbox = await resume(sandboxId, api);
   const left = sandbox.expiresAt ? sandbox.expiresAt.getTime() - Date.now() : SANDBOX_CONFIG.timeoutMs;
   if (left < SANDBOX_CONFIG.timeoutMs - 60_000) await sandbox.extendTimeout(SANDBOX_CONFIG.timeoutMs - left);
-  return sandboxProject(sandbox, sandbox.cwd);
+  return withStop(sandbox);
 }

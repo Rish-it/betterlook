@@ -57,6 +57,12 @@ export interface Usage {
   costUsd: number | null;
 }
 
+export interface SandboxUsage {
+  vcpus: number;
+  activeCpuMs: number | null;
+  durationMs: number | null;
+}
+
 export type TurnStatus = 'running' | 'awaiting-approval' | 'passed' | 'failed' | 'stopped' | 'error';
 
 export interface TurnRecord {
@@ -79,6 +85,7 @@ export interface TurnRecord {
   status: TurnStatus;
   error?: string;
   checkpoint: Checkpoint | null;
+  sandbox: SandboxUsage | null;
   startedAt: string;
   endedAt: string | null;
 }

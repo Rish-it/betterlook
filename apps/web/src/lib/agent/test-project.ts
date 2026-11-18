@@ -78,7 +78,7 @@ export const textStep = (text: string) => ({
   }),
 });
 
-export async function runTurn(options: {model: Exclude<LanguageModel, string>; messages: ModelMessage[]; project?: Project; abortSignal?: AbortSignal}) {
+export async function runTurn(options: {model: Exclude<LanguageModel, string>; messages: ModelMessage[]; project?: Project; abortSignal?: AbortSignal; keepSandbox?: boolean}) {
   const {stream, turn} = runAgent(options);
   const chunks: AgentChunk[] = [];
   for await (const chunk of stream) chunks.push(chunk);
