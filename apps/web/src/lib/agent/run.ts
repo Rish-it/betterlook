@@ -15,7 +15,7 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, SANDBOX_FAILED, userMessage} from './errors';
+import {errorStatus, SANDBOX_FAILED, STEP_LIMIT, userMessage, VERIFY_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
@@ -36,6 +36,13 @@ const addUsage = (total: Usage, u: LanguageModelUsage) => {
   total.outputTokens += u.outputTokens ?? 0;
   total.cachedInputTokens += u.inputTokenDetails.cacheReadTokens ?? 0;
 };
+
+export function noticeFor(record: TurnRecord): string | undefined {
+  if (record.status === 'error') return record.error;
+  if (record.status === 'failed') return VERIFY_FAILED;
+  if (record.stepLimitReached && record.status !== 'stopped') return STEP_LIMIT;
+  return undefined;
+}
 
 const lastUserText = (messages: ModelMessage[]) => {
   const content = messages.findLast(m => m.role === 'user')?.content;
@@ -101,6 +108,7 @@ export function runAgent({
     verify: null,
     repairAttempted: false,
     repairVerify: null,
+    stepLimitReached: false,
     status: 'running',
     checkpoint: null,
     startedAt: new Date().toISOString(),
@@ -182,17 +190,22 @@ export function runAgent({
       const settled = (outcome: Outcome) => {
         if (outcome.type === 'end') {
           addUsage(record.usage, outcome.event.totalUsage);
+          if (outcome.event.steps.length >= AGENT_CONFIG.maxSteps && outcome.event.finishReason === 'tool-calls') record.stepLimitReached = true;
           return true;
         }
         end(outcome.type === 'stopped' ? {status: 'stopped'} : {status: 'error', error: userMessage(outcome.error)});
         return false;
       };
 
+      const pipe = async (chunks: ReadableStream<AgentChunk>) => {
+        for await (const chunk of chunks) writer.write(chunk);
+      };
+
       try {
         approvalEvents(messages, record.id, record.traceId);
         const first = callModel(messages);
-        writer.merge(
-          toUIMessageStream({
+        await pipe(
+          toUIMessageStream<ToolSet, AgentMessage>({
             stream: first.result.stream,
             sendFinish: false,
             onError: userMessage,
@@ -212,7 +225,7 @@ export function runAgent({
         if (verify.ok) return end({status: 'passed', verify, checkpoint: saved.checkpoint, ...saved.diff});
 
         const repair = callModel([...messages, ...(await first.result.response).messages, {role: 'user', content: repairMessage(verify)}]);
-        writer.merge(toUIMessageStream({stream: repair.result.stream, sendStart: false, sendFinish: false, onError: userMessage}));
+        await pipe(toUIMessageStream<ToolSet, AgentMessage>({stream: repair.result.stream, sendStart: false, sendFinish: false, onError: userMessage}));
         const repairOutcome = await repair.outcome;
         if (!settled(repairOutcome)) return;
         const repaired = await commitTurn(project, record.id, saved.checkpoint.parentId);
@@ -233,7 +246,7 @@ export function runAgent({
         if (!record.endedAt) end({status: 'error', error: SANDBOX_FAILED});
         writer.write({type: 'error', errorText: SANDBOX_FAILED});
       } finally {
-        writer.write({type: 'finish'});
+        writer.write({type: 'finish', messageMetadata: {status: record.status, notice: noticeFor(record)}});
       }
     },
     onError: userMessage,

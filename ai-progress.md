@@ -183,7 +183,33 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
     - The fake values appear 0 times in the output. A relative `--tasks` path resolves from the repo root.
   - LIVE PROOF PENDING ENV: founder task file + OPENAI_EVAL_API_KEY + Vercel. Run `bun run agent:run --tasks <founder file> --runs 2` and confirm that each task has `run-1` and `run-2` folders, each holding `task.json`, `turn.json`, `diff.patch`, `verify.json`, `before.png` and `after.png`. The PNGs should show the preview before and after the edit, and each run's trace should appear in Langfuse.
 - [ ] End to end: "make the hero heading blue" from the landing screen edits the code, verify passes, the preview turns blue, and the trace has every tool call, the diff and the checkpoint id.
-- [ ] Failure states: rate limit, provider error, sandbox down, denied tool, failed verify and step limit each show a readable message, and the chat keeps working.
+
+  Not done, left unticked on the orchestrator's instruction: it needs the founder's `.env` (OpenAI key, Vercel credentials, Langfuse keys) and AI-UI's chat wired through `createAgentChat`. Every piece it exercises is built and tested at the mock level (items 2–8). LIVE PROOF PENDING ENV: from `/`, send "make the hero heading blue". The agent reads and edits `src/App.tsx` in the sandbox, verify passes (typecheck, build and runtime all passed), and the preview shows a blue heading. The Langfuse trace for the turn holds every tool call, the diff and `checkpointId`. Capture screenshots and the trace id.
+- [x] Failure states: rate limit, provider error, sandbox down, denied tool, failed verify and step limit each show a readable message, and the chat keeps working.
+
+  Built: every turn now ends with a `finish` chunk carrying assistant message metadata `{status, notice?}`. `notice` is the readable sentence for the outcome (`noticeFor(record)` in `run.ts`). The model stream is piped in order, so the `finish` always comes last, after any error chunk. The six cases:
+  - **Rate limit (429):** error chunk and notice "The model provider is rate limiting requests. Wait a minute and try again." The SDK unwraps its retry wrapper to find the 429. The runner retries these runs with backoff.
+  - **Provider error:** "The model provider returned an error. Try again." Provider text is never forwarded.
+  - **Sandbox down:**
+    - before the turn: `/api/chat` returns 503 "The preview sandbox is not reachable. Reload to try again.";
+    - mid-turn (git or command failure): error chunk and notice "The preview sandbox stopped responding. Reload to try again.";
+    - on load: `/api/sandbox` returns the 503 or 502 messages from the sandbox item.
+  - **Denied tool:** the `data-denied` part carries `message` (for example "/etc/passwd is outside the project folder."), the model gets the reason, and the turn carries on.
+  - **Failed verify:** status `failed`, notice "The change still fails its checks after one repair attempt. Restore the previous version or describe what to fix." The `data-checkpoint` part carries `parentId` for the restore.
+  - **Step limit:** `TurnRecord.stepLimitReached`, set when the run used all `maxSteps` and the last step still called tools; notice "The agent hit its step limit before finishing. Send another message to let it continue."
+  Evidence:
+  - `bun run typecheck` + `bun run test` run 1: pass, run 2: pass (64 tests). `failure.test.ts` runs one test per case. Each checks the readable message (error chunk and/or `metadata.notice`), that `finish` is the last chunk, that provider text such as "provider says no" never leaks, and then runs a normal turn afterwards ("Still here.", status `passed`) to show the chat keeps working.
+    - Sandbox down before the turn goes through the real `/api/chat` route and gets the 503 text.
+    - The step-limit test sees exactly `maxSteps` (20) model calls and `stepLimitReached: true`.
+  - UI: the real `runAgent` streams for rate limit, provider error and sandbox down mid-turn, built with the mock model, were served to the current workspace in sequence, followed by a normal reply:
+    - `.screenshots/failure-rate-limit-1440.png` ("The model provider is rate limiting requests. Wait a minute and try again.")
+    - `.screenshots/failure-provider-1440.png`
+    - `.screenshots/failure-sandbox-down-1440.png` ("The preview sandbox stopped responding. Reload to try again.")
+    - `.screenshots/failure-chat-keeps-working-1440.png` (the next message got "Still here, the chat works.")
+    The notices for denied, failed verify and step limit live in data parts and metadata. The current minimal workspace only renders `error.message`, so showing them is AI-UI's wiring, against the contract above.
+  - Live route after the change: `[agent] model call failed: 401`, `POST /api/chat 200`, then `401`.
+  - Secret grep over logs, `apps/web/src` and `apps/web/scripts`: the only hit is the fake masking fixture in `trace.test.ts`. No `.env`.
+  - LIVE PROOF PENDING ENV: with a real key and sandbox, trigger each case in the wired UI (a revoked or low-limit key for 429, a stopped sandbox, `/etc/passwd`, a deliberately broken edit, a long task) and confirm the notice shows and the next message works.
 
 ## types.ts changes
 
@@ -226,6 +252,10 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
 - Runner item, new exports: `lib/agent/runner.ts` (`parseTasks`, `evalCredential`, `runTasks`, `previewScreenshot`, `Task`, `RunSummary`), `RUNNER_CONFIG` in `config.ts`, `Project.readBytes`, and `RATE_LIMITED` in `errors.ts` (a 429 now gets its own message: "The model provider is rate limiting requests. Wait a minute and try again.").
 
+- Failure-states item, types: `AgentMetadata` gains `status?: TurnStatus` and `notice?: string`. Every turn now ends by writing assistant message metadata `{status, notice?}`, and `notice` is the readable sentence to show for that outcome. `TurnRecord` gains `stepLimitReached: boolean`.
+
+- Failure-states item, for AI-UI: render `message.metadata.notice` when it is set (the turn status is in `metadata.status`), and `data-denied` `data.message` for a policy denial. New exports in `errors.ts`: `RATE_LIMITED`, `VERIFY_FAILED`, `STEP_LIMIT`; `noticeFor(record)` in `run.ts`.
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:
@@ -247,6 +277,8 @@ Original questions:
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
 
+- End to end: "make the hero heading blue" from the landing page, verify passes, the preview turns blue, and the trace has every tool call, the diff and the checkpoint id (screenshots plus trace id).
+- Failure states: each case shows its notice in the wired UI, and the chat keeps working.
 - Headless runner: founder task file + OPENAI_EVAL_API_KEY + Vercel. `agent:run --runs 2` writes complete folders with real before and after screenshots, and each run has its trace.
 - Checkpoint and verify: in a real sandbox, the checker installs, the runtime check runs in the sandbox, a turn streams checkpoint, diff and verify, a broken edit gets one repair, and restore reverts the preview and logs the event.
 - Tools and policy: in a real sandbox, read and edit run; `/etc/passwd` is denied and shown; a `package.json` edit pauses, Approve writes and Deny leaves it.
