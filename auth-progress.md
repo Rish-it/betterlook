@@ -5,12 +5,30 @@ Branch `auth`. Dev server port `3600`.
 ## Checklist
 
 - [x] Research supported third-party sign-in and subscription billing, document the options, and stop for the founder’s choice. See the research and verification below.
-- [ ] Credential contract. Wait for the orchestrator before merging `betterlook`. Use the shared `ProviderCredential` to supply `runAgent()` from a signed-in request. Stop if the contract needs a change.
-- [ ] Sign-in flow for each chosen option. Implement start, callback, state and PKCE checks, founder-approved storage, refresh before expiry, sign-out, and revocation. Test state, PKCE, and refresh with `bun test`.
+- [ ] Credential contract. Use the shared `ProviderCredential` to supply `runAgent()` from a signed-in request. Stop if the contract needs a change.
+  - Merged `betterlook` at `6f793446` in merge commit `fba5c507` and installed the frozen lockfile. Root `bun run typecheck --incremental false` passed twice.
+  - OpenAI provider ID landed on `betterlook` at `0dccdb9a` and is merged into `auth` at `78f21ca9`.
+  - **Confirmed chat contract.** `lib/auth/client.ts` exports `getCredential(): ProviderCredential | null` and returns only the browser-held API key. `/api/chat` resolves `body.credential ?? await getServerCredential(request)`. `lib/auth/server.ts` exports `getServerCredential(request: Request): Promise<ProviderCredential | null>`, reads the encrypted HTTP-only session, serializes refreshes near expiry, and returns the OpenAI OAuth access credential for that call. `expiresAt` is an epoch timestamp in milliseconds. OAuth tokens stay out of browser JavaScript and request bodies.
+- [x] Sign-in flow. The registered web-client flow uses state, nonce, and S256 PKCE. The callback verifies the OpenAI RS256 signature, issuer and audience before creating a session. Refreshes serialize per session. Sign-out invalidates the local session and attempts remote revocation.
+  - Mocked endpoint tests cover transaction binding, replay, ID-token verification, consent, expiry, concurrent refresh, token rotation, sign-out during refresh, and revocation failure. Two clean root typechecks passed. `bun test` passed twice, including 22 sign-in tests. Next.js on port 3600 completed the mocked start, callback, session, and sign-out through the real routes in two runs.
+  - Provisional storage uses an encrypted HTTP-only cookie with an opaque session ID and no `Expires` or `Max-Age`. A single server process holds tokens and one-time transactions in memory. Transactions expire after 10 minutes and sessions after eight hours. Process restarts end sessions. Browser session restore may restore a cookie until the server session expires. Confirm custody, deployment topology, and revocation with OpenAI before hosted rollout. [Website integration](https://developers.openai.com/siwc/website), [discovery](https://auth.openai.com/.well-known/openid-configuration), [token lifecycle reference](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
+  - LIVE PROOF PENDING ENV: With the approved hosted registration, verify the consent screen, exact callback, grant scopes, confidential-client authentication if provisioned, refresh before expiry, and provider revocation on sign-out.
 - [ ] Sign-in UI. Build a slot-ready entry and signed-in state with account, provider, and sign-out. Capture and inspect light and dark screenshots.
 - [ ] Hand-off. Stop unless the founder has supplied a signed-in test account. Verify that its credential reaches `runAgent()` and gets a reply.
 - [ ] Failure states. Verify readable messages and API-key fallback for consent denial, expired and revoked tokens, refresh failure, and provider outage.
 - [ ] Secret hygiene. Verify that logs, screenshots, test output, and traces contain no tokens, client secrets, or `.env` values.
+
+## Founder decision
+
+Build browser-held per-request API keys and official Sign in with ChatGPT for OpenAI. Claude, Gemini, and Grok sign-in are outside this loop. ChatGPT uses a provisional encrypted HTTP-only browser-session cookie behind one storage module, pending OpenAI's approval of hosted custody. Mock provider endpoints for automated checks while registration is pending. Put each deferred check under its item as `LIVE PROOF PENDING ENV: <exact check>` and maintain the list below.
+
+The hosted flow reads `OPENAI_SIWC_CLIENT_ID`, `OPENAI_SIWC_REDIRECT_URI` (exact registered URL ending in `/api/auth/chatgpt/callback`), `OPENAI_SIWC_PLAN_SCOPES` (the granted integration's space-separated scope names), and `BETTERLOOK_AUTH_COOKIE_KEY` (32 random bytes encoded as unpadded base64url). Supply `OPENAI_SIWC_CLIENT_SECRET` if provisioned as `client_secret_basic` and `OPENAI_SIWC_RESOURCE` if required by OpenAI. Keep these values in server env. The public website docs cover identity-only registration. The hosted plan grant settings come from OpenAI for this app. [Partner quickstart](https://developers.openai.com/siwc/quickstart), [website client setup](https://developers.openai.com/siwc/website)
+
+## Pending e2e
+
+- Complete the hosted OpenAI consent flow under Betterlook's approved client and registered callback, then confirm the workspace displays the signed-in account.
+- Send one workspace chat request using ChatGPT plan access and confirm `runAgent()` gets a reply under that user's allowance. Repeat with a founder-provided OpenAI API key and confirm the reply uses API billing.
+- Sign out after live OAuth consent and confirm provider-side disconnection and that the prior session cannot start another subscription-billed turn.
 
 ## Research — 2026-11-18
 
@@ -49,7 +67,7 @@ For Google API OAuth, identity scopes are `openid` plus `email` or `profile` if 
 
 Desktop tools can invoke an official CLI on the user's machine and let it handle browser sign-in and credential storage. Codex documents that flow and offers a separate integration with Codex app-server using approved Sign in with ChatGPT credentials. Claude Code handles the user's own subscription in its official binary, including under its explicit hosted exception. Grok Build documents headless and ACP integrations and accepts subscription sign-in in the official CLI. Antigravity restricts third-party use of its consumer service. A browser-only Betterlook has no local process to run a CLI. A local companion or user-controlled runtime would change the deployment and agent contract. A hosted subprocess still needs explicit provider support and an approved way to isolate the user's execution and session. [Codex authentication](https://learn.chatgpt.com/docs/auth), [Codex app-server](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server), [Claude Code hosted terms](https://code.claude.com/docs/en/legal-and-compliance#can-customers-offer-claude-code-in-their-products), [Grok Build](https://docs.x.ai/build/overview), [Antigravity terms](https://antigravity.google/terms)
 
-### Founder decision — STOP
+### Research recommendation — initial checkpoint
 
 Keep user-provided API keys for this MVP. If the founder expands the scope, prioritize applying for the hosted Sign in with ChatGPT trial with plan usage enabled. Ask OpenAI to confirm Betterlook's execution model and credential custody because the public terms impose user control and local persistence while hosted partner examples exist. Keep Claude and Gemini on API keys for this loop. Consider Claude linked billing only if the founder wants a separate paid API billing option for customer organizations. Consider Grok only if the founder wants the model and xAI confirms Betterlook can join its subscription integration.
 
