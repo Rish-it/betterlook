@@ -12,3 +12,5 @@ export function unshownApprovals(messages: AgentMessage[]): string[] {
     return m.parts.flatMap(p => (isToolPart(p) && p.state === 'approval-requested' && !cards.has(p.toolCallId) ? [p.approval.id] : []));
   });
 }
+
+export const uniqueById = (messages: AgentMessage[]) => [...new Map(messages.map(m => [m.id, m])).values()];

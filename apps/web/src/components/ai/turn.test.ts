@@ -1,6 +1,6 @@
 import {expect, test} from 'bun:test';
 import type {AgentMessage} from '@/lib/agent/types';
-import {unshownApprovals} from './turn';
+import {uniqueById, unshownApprovals} from './turn';
 
 const approvalPart = {
   type: 'tool-write_file',
@@ -21,4 +21,11 @@ test('an approval request with card data, or already answered, is left alone', (
   expect(unshownApprovals([assistant([card, approvalPart])])).toEqual([]);
   const answered = {...approvalPart, state: 'approval-responded', approval: {id: 'approval_pkg', approved: false}} as const;
   expect(unshownApprovals([assistant([answered])])).toEqual([]);
+});
+
+test('a message that arrives twice under one id renders once, as its latest copy', () => {
+  const first = assistant([{type: 'text', text: 'old'}]);
+  const user: AgentMessage = {id: 'msg_u', role: 'user', parts: [{type: 'text', text: 'hi'}]};
+  const latest = {...first, parts: [{type: 'text' as const, text: 'new'}]};
+  expect(uniqueById([user, first, latest])).toEqual([user, latest]);
 });
