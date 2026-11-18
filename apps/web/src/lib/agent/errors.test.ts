@@ -1,9 +1,9 @@
 /// <reference types="bun" />
 import {afterEach, expect, spyOn, test} from 'bun:test';
-import {APICallError, toUIMessageStream} from 'ai';
+import {APICallError} from 'ai';
 import {MockLanguageModelV4} from 'ai/test';
 import {KEY_REJECTED, PROVIDER_FAILED, userMessage} from './errors';
-import {runAgent} from './run';
+import {runTurn} from './test-project';
 
 const FAKE_KEY_ECHO = 'Incorrect API key provided: fake-***-4321';
 const apiError = (statusCode: number) =>
@@ -22,9 +22,8 @@ test('a rejected key reaches the chat as a clear message and never leaks provide
   const logged: unknown[][] = [];
   spyOn(console, 'error').mockImplementation((...args: unknown[]) => void logged.push(args));
   const model = new MockLanguageModelV4({doStream: async () => { throw apiError(401); }});
-  const {result} = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
-  const chunks = [];
-  for await (const chunk of toUIMessageStream({stream: result.stream, onError: userMessage})) chunks.push(chunk);
+  const {chunks, record} = await runTurn({model, messages: [{role: 'user', content: 'hi'}]});
+  expect(record).toMatchObject({status: 'error', error: KEY_REJECTED});
   expect(chunks).toContainEqual({type: 'error', errorText: KEY_REJECTED});
   expect(JSON.stringify(chunks)).not.toContain('fake-');
   expect(logged).toEqual([['[agent] model call failed:', 401]]);

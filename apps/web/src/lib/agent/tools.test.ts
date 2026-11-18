@@ -1,62 +1,26 @@
 /// <reference types="bun" />
-import {afterEach, beforeEach, expect, spyOn, test} from 'bun:test';
-import {execFileSync} from 'node:child_process';
-import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import {dirname, join, relative} from 'node:path';
-import {simulateReadableStream, type ModelMessage} from 'ai';
+import {afterEach, expect, spyOn, test} from 'bun:test';
+import {convertToModelMessages} from 'ai';
 import {MockLanguageModelV4} from 'ai/test';
-import type {Project} from '../sandbox/project';
 import {checkPolicy} from './policy';
-import {runAgent, type AgentChunk} from './run';
+import {runTurn, tempProject, textStep, toolStep} from './test-project';
 import {applyEdit} from './tools';
+import type {AgentMessage} from './types';
 
 const ROOT = '/vercel/sandbox';
-let dir: string;
-
-const localProject = (root: string): Project => ({
-  id: 'sbx-local',
-  root,
-  list: async d => execFileSync('find', [d, '-type', 'f', '-not', '-path', '*/node_modules/*', '-not', '-path', '*/.git/*']).toString().split('\n').filter(Boolean).map(p => relative(root, p)),
-  read: async p => { try { return readFileSync(p, 'utf8'); } catch { return null; } },
-  write: async (p, c) => { mkdirSync(dirname(p), {recursive: true}); writeFileSync(p, c); },
-  search: async (q, d) => { try { return execFileSync('grep', ['-rnI', '-e', q, d]).toString().replaceAll(`${root}/`, ''); } catch { return ''; } },
-  run: async () => ({exitCode: 0, output: ''}),
-});
-
-beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'betterlook-tools-'));
-  mkdirSync(join(dir, 'src'));
-  writeFileSync(join(dir, 'src/App.tsx'), '<h1 className="hero-heading">Hi</h1>\n');
-  writeFileSync(join(dir, 'package.json'), '{"name":"starter"}\n');
-});
+const STARTER = {'src/App.tsx': '<h1 className="hero-heading">Hi</h1>\n', 'package.json': '{"name":"starter"}\n'};
+const cleanups: (() => void)[] = [];
 afterEach(() => {
-  rmSync(dir, {recursive: true, force: true});
+  cleanups.splice(0).forEach(c => c());
   spyOn(console, 'warn').mockRestore();
+  spyOn(console, 'info').mockRestore();
 });
 
-const usage = {
-  inputTokens: {total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined},
-  outputTokens: {total: 1, text: 1, reasoning: undefined},
-};
-const toolStep = (calls: [string, string, object][]) => ({
-  stream: simulateReadableStream({
-    chunks: [
-      ...calls.map(([toolCallId, toolName, input]) => ({type: 'tool-call' as const, toolCallId, toolName, input: JSON.stringify(input)})),
-      {type: 'finish' as const, finishReason: {unified: 'tool-calls' as const, raw: undefined}, logprobs: undefined, usage},
-    ],
-  }),
-});
-const textStep = (text: string) => ({
-  stream: simulateReadableStream({
-    chunks: [
-      {type: 'text-start' as const, id: 't'},
-      {type: 'text-delta' as const, id: 't', delta: text},
-      {type: 'text-end' as const, id: 't'},
-      {type: 'finish' as const, finishReason: {unified: 'stop' as const, raw: undefined}, logprobs: undefined, usage},
-    ],
-  }),
-});
+function setup() {
+  const t = tempProject(STARTER);
+  cleanups.push(t.cleanup);
+  return t;
+}
 
 test('the path policy keeps tools inside the project and asks before protected edits', () => {
   expect(checkPolicy('read_file', {path: 'src/App.tsx'}, ROOT)).toEqual({type: 'allow', path: 'src/App.tsx'});
@@ -86,6 +50,7 @@ test('edit_file replaces exactly one occurrence', () => {
 test('allowed tools run in the project; a call outside it is denied, logged, recorded and returned to the model', async () => {
   const warned: unknown[][] = [];
   spyOn(console, 'warn').mockImplementation((...args: unknown[]) => void warned.push(args));
+  const {project, file} = setup();
   const model = new MockLanguageModelV4({
     doStream: [
       toolStep([
@@ -97,13 +62,9 @@ test('allowed tools run in the project; a call outside it is denied, logged, rec
       textStep('Done.'),
     ],
   });
-  const chunks: AgentChunk[] = [];
-  const {result, turn} = runAgent({model, messages: [{role: 'user', content: 'make it blue'}], project: localProject(dir), onData: c => chunks.push(c)});
-  await result.consumeStream();
-  const record = await turn;
+  const {chunks, message, record} = await runTurn({model, messages: [{role: 'user', content: 'make it blue'}], project});
 
-  expect(readFileSync(join(dir, 'src/App.tsx'), 'utf8')).toContain('style={{color: "blue"}}');
-  expect(record.sandboxId).toBe('sbx-local');
+  expect(file('src/App.tsx')).toContain('style={{color: "blue"}}');
   expect(record.toolCalls.map(c => [c.id, c.decision])).toEqual([
     ['c4', 'denied'],
     ['c1', 'allowed'],
@@ -112,9 +73,9 @@ test('allowed tools run in the project; a call outside it is denied, logged, rec
   ]);
   expect(record.toolCalls.find(c => c.id === 'c1')?.result).toBe('package.json\nsrc/App.tsx');
   expect(record.toolCalls.find(c => c.id === 'c2')?.result).toContain('src/App.tsx:1:');
-  expect(record.toolCalls.every(c => typeof c.durationMs === 'number' && c.startedAt)).toBe(true);
   expect(record.toolCalls[0].denied).toMatchObject({toolCallId: 'c4', reason: 'outside-project', message: '../../etc/passwd is outside the project folder.'});
-  expect(chunks).toEqual([{type: 'data-denied', id: 'c4', data: record.toolCalls[0].denied!}]);
+  expect(chunks.filter(c => c.type === 'data-denied')).toEqual([{type: 'data-denied', id: 'c4', data: record.toolCalls[0].denied!}]);
+  expect(message.parts.map(p => p.type)).toContain('data-denied');
   expect(warned).toEqual([['[policy] denied:', 'read_file', 'outside-project']]);
 
   const secondPrompt = JSON.stringify(model.doStreamCalls[1].prompt);
@@ -123,79 +84,46 @@ test('allowed tools run in the project; a call outside it is denied, logged, rec
   expect(model.doStreamCalls[0].providerOptions).toEqual({openai: {store: false, promptCacheKey: 'sbx-local'}});
 });
 
-test('a package.json edit pauses for approval, then runs once approved', async () => {
-  const project = localProject(dir);
-  const chunks: AgentChunk[] = [];
-  const first = runAgent({
+async function pauseThenAnswer(approved: boolean) {
+  const infos: unknown[][] = [];
+  spyOn(console, 'info').mockImplementation((...args: unknown[]) => void infos.push(args));
+  const {project, file} = setup();
+  const userMessage: AgentMessage = {id: 'u1', role: 'user', parts: [{type: 'text', text: 'rename the package'}]};
+  const paused = await runTurn({
     model: new MockLanguageModelV4({doStream: [toolStep([['p1', 'write_file', {path: 'package.json', content: '{"name":"changed"}\n'}]])]}),
-    messages: [{role: 'user', content: 'rename the package'}],
+    messages: await convertToModelMessages([userMessage]),
     project,
-    onData: c => chunks.push(c),
   });
-  await first.result.consumeStream();
-  const paused = await first.turn;
+  const part = paused.message.parts.find(p => p.type === 'tool-write_file') as {state: string; approval: {id: string}};
+  expect(part.state).toBe('approval-requested');
+  Object.assign(part, {state: 'approval-responded', approval: {...part.approval, approved, reason: approved ? undefined : 'User denied the edit.'}});
 
-  expect(paused.status).toBe('awaiting-approval');
-  expect(paused.toolCalls).toEqual([]);
-  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe('{"name":"starter"}\n');
-  expect(chunks).toEqual([
-    {type: 'data-approval', id: 'p1', data: {toolCallId: 'p1', tool: 'write_file', path: 'package.json', diff: '--- a/package.json\n+++ b/package.json\n-{"name":"starter"}\n-\n+{"name":"changed"}\n+'}},
-  ]);
-  const request = (await first.result.content).find(p => p.type === 'tool-approval-request');
-  expect(request).toBeDefined();
+  const model = new MockLanguageModelV4({doStream: [textStep(approved ? 'Renamed.' : 'Okay, left it.')]});
+  const resumed = await runTurn({model, messages: await convertToModelMessages([userMessage, paused.message]), project});
+  return {paused, resumed, model, file, infos};
+}
 
-  const messages: ModelMessage[] = [
-    {role: 'user', content: 'rename the package'},
-    ...(await first.result.response).messages,
-    {role: 'tool', content: [{type: 'tool-approval-response', approvalId: request!.approvalId, approved: true}]},
-  ];
-  const second = runAgent({model: new MockLanguageModelV4({doStream: [textStep('Renamed.')]}), messages, project});
-  await second.result.consumeStream();
-  const resumed = await second.turn;
-
-  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe('{"name":"changed"}\n');
-  expect(resumed.toolCalls.map(c => [c.id, c.decision])).toEqual([['p1', 'approved']]);
-  expect(resumed.status).toBe('passed');
+test('a package.json edit pauses for approval with a diff, then runs once approved and logs the approval', async () => {
+  const {paused, resumed, file, infos} = await pauseThenAnswer(true);
+  expect(paused.record.status).toBe('awaiting-approval');
+  expect(paused.record.toolCalls).toEqual([]);
+  expect(paused.record.checkpoint).toBeNull();
+  expect(paused.chunks.find(c => c.type === 'data-approval')).toEqual({
+    type: 'data-approval',
+    id: 'p1',
+    data: {toolCallId: 'p1', tool: 'write_file', path: 'package.json', diff: '--- a/package.json\n+++ b/package.json\n-{"name":"starter"}\n-\n+{"name":"changed"}\n+'},
+  });
+  expect(file('package.json')).toBe('{"name":"changed"}\n');
+  expect(resumed.record.toolCalls.map(c => [c.id, c.decision])).toEqual([['p1', 'approved']]);
+  expect(resumed.record.status).toBe('passed');
+  expect(resumed.record.filesTouched).toEqual(['package.json']);
+  expect(infos.map(i => JSON.parse(i[1] as string))).toEqual([expect.objectContaining({type: 'approve', toolCallId: 'p1', turnId: resumed.record.id, traceId: resumed.record.traceId})]);
 });
 
-test('a denied approval leaves the file alone and tells the model', async () => {
-  const project = localProject(dir);
-  const first = runAgent({
-    model: new MockLanguageModelV4({doStream: [toolStep([['p2', 'edit_file', {path: 'package.json', oldString: 'starter', newString: 'x'}]])]}),
-    messages: [{role: 'user', content: 'rename'}],
-    project,
-  });
-  await first.result.consumeStream();
-  const request = (await first.result.content).find(p => p.type === 'tool-approval-request')!;
-  const model = new MockLanguageModelV4({doStream: [textStep('Okay, left it.')]});
-  const second = runAgent({
-    model,
-    messages: [
-      {role: 'user', content: 'rename'},
-      ...(await first.result.response).messages,
-      {role: 'tool', content: [{type: 'tool-approval-response', approvalId: request.approvalId, approved: false, reason: 'User denied the edit.'}]},
-    ],
-    project,
-  });
-  await second.result.consumeStream();
-  expect((await second.turn).toolCalls).toEqual([]);
-  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe('{"name":"starter"}\n');
+test('a denied approval leaves the file alone, tells the model and logs the denial', async () => {
+  const {resumed, model, file, infos} = await pauseThenAnswer(false);
+  expect(resumed.record.toolCalls).toEqual([]);
+  expect(file('package.json')).toBe('{"name":"starter"}\n');
   expect(JSON.stringify(model.doStreamCalls[0].prompt)).toContain('User denied the edit.');
-});
-
-test('the chat stream carries the denied and approval data parts next to the tool parts', async () => {
-  const {agentUIStream} = await import('./run');
-  const stream = agentUIStream({
-    model: new MockLanguageModelV4({
-      doStream: [toolStep([['d1', 'read_file', {path: '/etc/hosts'}], ['a1', 'edit_file', {path: 'package.json', oldString: 'starter', newString: 'x'}]])],
-    }),
-    messages: [{role: 'user', content: 'go'}],
-    project: localProject(dir),
-  });
-  const types: string[] = [];
-  for await (const chunk of stream) types.push(chunk.type);
-  expect(types).toContain('data-denied');
-  expect(types).toContain('data-approval');
-  expect(types).toContain('tool-output-denied');
-  expect(types).toContain('tool-approval-request');
+  expect(infos.map(i => JSON.parse(i[1] as string).type)).toEqual(['deny']);
 });

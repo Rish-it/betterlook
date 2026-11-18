@@ -120,7 +120,43 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
     1. Ask "read src/App.tsx and make the heading blue": `read_file` and `edit_file` run in the sandbox and the preview updates.
     2. Ask "read /etc/passwd": the denial appears as a `data-denied` part, the model explains it, and the server log shows `[policy] denied: read_file outside-project`.
     3. Ask "add lodash to package.json": the turn pauses with a `data-approval` diff; Approve writes it, Deny leaves it.
-- [ ] Checkpoint and verify: commit per turn, verify after each turn, one repair attempt, failed-turn state, restore works, events logged.
+- [x] Checkpoint and verify: commit per turn, verify after each turn, one repair attempt, failed-turn state, restore works, events logged.
+
+  Built: `runAgent()` now owns the whole turn and returns `{stream, turn}`, one `createUIMessageStream` used by both `/api/chat` and the CLI:
+  1. **Model call.** If it ends on a pending approval, the status is `awaiting-approval` and nothing is committed. If there is no project, it ends `passed`.
+  2. **`commitTurn`** (`lib/agent/checkpoint.ts`): `git add -A`, diff and files against the turn's base, `git commit --allow-empty -m "turn <id>"`. The stream gets `data-checkpoint` (`id`, `parentId`) and `data-diff`.
+  3. **`verifyProject`** (`lib/agent/verify.ts`), then a `data-verify` part (id `verify`):
+     - `typecheck` (`npm run typecheck`) and `build` (`npm run build`), each `passed` or `failed` with the last 40 output lines;
+     - `runtime`: a headless Chromium checker inside the sandbox (`lib/sandbox/runtime-check.ts`, installed at sandbox creation under `/tmp/betterlook`) loads `localhost:5173` and reports console errors and page errors. It is `skipped` when the build failed, and `skipped` with the reason when the checker itself cannot run, so infrastructure trouble never counts against the agent.
+  4. **If verify failed, exactly one repair:** a second model call with the history plus `REPAIR_PROMPT` filled with the failing checks' errors (a founder slot in `system-prompt.ts`, included in `systemPromptHash`). Then a second commit against the same base (`data-checkpoint` and `data-diff` replaced), a second verify (`data-verify` id `repair-verify`), and status `passed` or `failed`. There is no further loop.
+  5. **Errors:** a sandbox or git failure mid-turn sets the turn to `error` and streams "The preview sandbox stopped responding. Reload to try again."
+  - **Restore:** `restoreCheckpoint(project, id)` runs `git read-tree -u --reset <id>` plus a commit `restore <id>`. History stays linear, so every checkpoint, including later ones, stays restorable. The id is validated as a hex sha.
+  - **Events (`lib/agent/events.ts` `logEvent`):** one `[event] {json}` log line plus a `betterlook.event.<type>` span joined to the turn's trace when `traceId` is known.
+    - approve/deny: logged server-side from the approval responses in the incoming request;
+    - restore: `POST /api/restore` logs it;
+    - keep: `POST /api/events`, which accepts keep only.
+  - Message metadata on the assistant message: `{turnId, traceId}`.
+  Evidence:
+  - `bun run typecheck` + `bun run test` run 1: pass, run 2: pass (51 tests, including AUTH's). `turn.test.ts` runs a mock model on a temp project with real git and scripted npm/node:
+    - **Clean turn:** status `passed`; the checkpoint is the new HEAD and its parent is the starter; commit `turn <id>`; `filesTouched ['src/App.tsx']`; the diff holds the edit; checks typecheck, build and runtime all `passed`; data parts arrive in order checkpoint, diff, verify; the stream ends with `finish`.
+    - **First typecheck fails:** exactly 4 model calls; the repair prompt holds the TS error; `repairAttempted`, `verify.ok=false`, `repairVerify.ok=true`, status `passed`; the checkpoint parent is still the starter; the log shows two turn commits; verify parts `verify` and `repair-verify`.
+    - **Build always fails:** exactly 3 model calls (the 4th scripted reply is never used), status `failed`, runtime `skipped`.
+    - **Restore:** restoring to `parentId` gives back the starter file and a `restore <sha>` commit; restoring forward to the checkpoint brings the edit back; `HEAD; rm -rf /` is rejected.
+    - **Runtime parser:** passed, failed with errors, and skipped when the checker cannot run. The repair message lists only failed checks.
+    - **Routes:** keep through `/api/events` returns 204 and logs `{type: 'keep', turnId, traceId}`; other types get 400. `/api/restore` returns 400 on missing fields and 503 when unconfigured.
+  - `tools.test.ts` now drives approval through the real UI message (`approval-requested` → `approval-responded` → `convertToModelMessages`) and checks the server-side `approve` and `deny` event logs.
+  - **Real verify on the local starter** (real `tsc`, real `vite build`, the real checker script in headless Chromium against the running dev server):
+    - `clean true [typecheck passed, build passed, runtime passed]`
+    - `runtime-error false [typecheck passed, build passed, runtime failed "hero exploded"]`
+    - `syntax-error false [typecheck failed "src/App.tsx(8,3): error TS1005: '>' expected.", build failed "✗ Build failed", runtime skipped]`
+  - No screenshot: rendering verify, restore and keep is AI-UI's job, and the stream contract is proven above.
+  - No `.env`; the secret-pattern grep only hits the masking fixture in `trace.test.ts`.
+  - LIVE PROOF PENDING ENV:
+    1. In a real Vercel sandbox, sandbox creation installs the checker (`playwright install --with-deps chromium` with sudo) and the runtime check loads `localhost:5173` inside the sandbox.
+    2. One UI turn shows the checkpoint, diff and verify parts.
+    3. A broken edit triggers exactly one repair.
+    4. Restore through `restoreCheckpoint()` reverts the preview, and `[event] restore` appears in the log and in the Langfuse trace.
+  - Fragile: the checker install adds Chromium and its system libraries to sandbox creation (slow, and needs `sudo` in the sandbox image). Whether `/tmp/betterlook` survives a persistent-sandbox stop and resume is unverified; if it does not, the runtime check reports `skipped`, not `failed`.
 - [ ] Headless runner: agent:run on a two-task sample file from the founder produces complete run folders, 2 runs each, through the same runAgent().
 - [ ] End to end: "make the hero heading blue" from the landing screen edits the code, verify passes, the preview turns blue, and the trace has every tool call, the diff and the checkpoint id.
 - [ ] Failure states: rate limit, provider error, sandbox down, denied tool, failed verify and step limit each show a readable message, and the chat keeps working.
@@ -151,9 +187,25 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
   - `tools.ts`: `TOOL_DEFINITIONS`, `createTools`, `applyEdit`, `proposedDiff`.
 - Tools item, for AI-UI: `lib/agent/client.ts` exports `createAgentChat({getCredential, getSandboxId, messages?})`, which returns `Chat<AgentMessage>`. Pass it as `useChat({chat})`, send with `sendMessage({text, metadata: {model}}, {body: {model}})`, and answer approvals with `chat.addToolApprovalResponse({id: part.approval.id, approved, reason?})`; the chat continues by itself. `/api/chat` now reads `sandboxId` from the body, so the workspace must send it (`createAgentChat` does). Until then the agent has no tools in the live UI.
 
+- Checkpoint item, types: `Checkpoint.parentId` (the commit before the turn, so "undo this turn" is a restore to `parentId`), and every `TurnEvent` gets an optional `traceId`, so events land in the turn's Langfuse trace.
+
+- AUTH fold-in (orchestrator): merged `betterlook` (18533f49, merge `25db853e`). `/api/chat` imports the real `getServerCredential` from `@/lib/auth/server` (stub deleted). `parseCredential` accepts only `{provider: 'openai', kind: 'api-key', apiKey}` from the request body; an `oauth` credential in the body is rejected with the missing-key 401, so OAuth only comes from the session cookie. Tested in `app/api/chat/route.test.ts`.
+
+- **Checkpoint item, for AI-UI (all on `ai-core`):**
+  1. **Stream.** At turn end, the stream writes `data-checkpoint` (id `checkpoint`, a `Checkpoint` with `id` and `parentId`), `data-diff` (id `diff`, a `TurnDiff`) and `data-verify` (id `verify`, a `VerifyResult`). After the single repair it writes `data-checkpoint` and `data-diff` again (same ids, so they replace) and a second `data-verify` with id `repair-verify`. A turn paused for approval writes none of them. The assistant message metadata is `{turnId, traceId}`. `TurnRecord.status` ends as `passed`, `failed`, `awaiting-approval`, `stopped` or `error`.
+  2. **`VerifyCheck.status`** is `'passed' | 'failed' | 'skipped'` (`7449b371`). Runtime is `skipped` when the build failed or the checker could not run. Show skipped as neutral; `VerifyResult.ok` is the overall pass.
+  3. **Restore and keep**, from `lib/agent/client.ts`:
+     - `restoreCheckpoint({sandboxId, checkpointId, turnId, traceId?})` → `POST /api/restore` → `{headId}`. To undo a turn, pass `checkpoint.parentId`; to return to a turn's result, pass `checkpoint.id`. The server logs the `restore` TurnEvent. On failure it throws an Error whose message is the route's readable text.
+     - `keepTurn({turnId, traceId?})` → `POST /api/events` → logs the `keep` TurnEvent.
+     - Approve and deny need no client call: the server logs them when the approval response arrives with the next request (`chat.addToolApprovalResponse`).
+  - Server exports: `runAgent(...)` now returns `{stream, turn}` (`agentUIStream` removed); `SYSTEM_PROMPT_HASH` (prompt plus repair prompt); `repairMessage`; `checkpoint.ts` (`commitTurn`, `restoreCheckpoint`); `verify.ts` (`verifyProject`, `runtimeErrors`); `events.ts` (`logEvent`, `parseKeepEvent`).
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:
+
+- **Headless runner (blocked, needs the founder):** please give the two-task sample file for `agent:run`, and confirm its format. My default is JSON: `[{"id": "hero-blue", "prompt": "..."}]`, with any extra fields the founder's judges need passed through untouched into each run folder. I won't write task content. The live runner will also need `OPENAI_EVAL_API_KEY` (a key separate from users', so it doesn't share their rate-limit budget) plus the Vercel credentials in `apps/web/.env`.
+- **Runner runtime note:** `@vercel/sandbox` does not load under Bun, so `bun run agent:run` will run the script under Node (`bun run` → `node --experimental-strip-types`), or through a small Node bundle if Node's type stripping cannot resolve the extensionless imports. I'll pick at build time.
 
 - Resolved: the picker default moves to AI-UI importing `lib/agent/models.ts` (see types.ts changes). Until AI-UI wires it, `Workspace.tsx` still seeds from `composer/models.ts`, so a non-OpenAI pick shows "<model> is not connected yet."
 
@@ -169,6 +221,7 @@ Original questions:
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
 
+- Checkpoint and verify: in a real sandbox, the checker installs, the runtime check runs in the sandbox, a turn streams checkpoint, diff and verify, a broken edit gets one repair, and restore reverts the preview and logs the event.
 - Tools and policy: in a real sandbox, read and edit run; `/etc/passwd` is denied and shown; a `package.json` edit pauses, Approve writes and Deny leaves it.
 - Sandbox: real Vercel sandbox from the landing prompt, the preview shows the starter, a reload reconnects to the same sandbox, and a stopped sandbox resumes with the dev server restarted.
 - Tracing: a Langfuse trace per turn with nested model spans, hashes in metadata, record as output, cost computed; hash changes after a prompt edit; exported trace JSON has no `.env` value.

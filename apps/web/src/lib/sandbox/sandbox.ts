@@ -1,5 +1,6 @@
 import type {Sandbox} from '@vercel/sandbox';
 import {sandboxProject, type Project} from './project';
+import {CHECKER_DIR, CHECKER_ENV, CHECKER_PLAYWRIGHT, CHECKER_SCRIPT, CHECKER_SOURCE} from './runtime-check';
 import {PREVIEW_PORT, STARTER_FILES} from './starter';
 
 type SandboxApi = Pick<typeof Sandbox, 'create' | 'get'>;
@@ -36,6 +37,16 @@ export async function createSandbox(api?: SandboxApi): Promise<SandboxInfo> {
   await run(sandbox, 'git', ['config', 'user.email', 'agent@betterlook.invalid']);
   await run(sandbox, 'git', ['add', '-A']);
   await run(sandbox, 'git', ['commit', '-q', '-m', 'starter']);
+  await sandbox.mkDir(CHECKER_DIR);
+  await sandbox.writeFiles([{path: CHECKER_SCRIPT, content: CHECKER_SOURCE}]);
+  await run(sandbox, 'npm', ['install', '--prefix', CHECKER_DIR, '--no-audit', '--no-fund', CHECKER_PLAYWRIGHT]);
+  const browsers = await sandbox.runCommand({
+    cmd: 'npx',
+    args: ['--prefix', CHECKER_DIR, 'playwright', 'install', '--with-deps', 'chromium'],
+    env: CHECKER_ENV,
+    sudo: true,
+  });
+  if (browsers.exitCode !== 0) throw new Error(`playwright install failed (exit ${browsers.exitCode})`);
   await startPreview(sandbox);
   return info(sandbox);
 }

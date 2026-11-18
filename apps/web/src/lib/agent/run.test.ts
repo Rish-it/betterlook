@@ -5,7 +5,7 @@ import {MockLanguageModelV4} from 'ai/test';
 import {AGENT_CONFIG} from './config';
 import {languageModel, parseCredential, providerOf} from './model';
 import {MODELS} from './models';
-import {runAgent} from './run';
+import {runTurn} from './test-project';
 
 const usage = {
   inputTokens: {total: 3, noCache: 3, cacheRead: undefined, cacheWrite: undefined},
@@ -29,8 +29,10 @@ const textModel = (chunks: string[], delay?: number) =>
 
 test('streams the model reply with the configured limits', async () => {
   const model = textModel(['Hel', 'lo']);
-  const {result} = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
-  expect(await result.text).toBe('Hello');
+  const {message, record} = await runTurn({model, messages: [{role: 'user', content: 'hi'}]});
+  expect(message.parts.find(p => p.type === 'text')).toMatchObject({text: 'Hello'});
+  expect(message.metadata).toEqual({turnId: record.id, traceId: record.traceId});
+  expect(record.status).toBe('passed');
   const call = model.doStreamCalls[0];
   expect(call.maxOutputTokens).toBe(AGENT_CONFIG.maxOutputTokens);
   expect(call.providerOptions).toEqual({openai: {store: false}});
@@ -38,14 +40,14 @@ test('streams the model reply with the configured limits', async () => {
 
 test('stops streaming when aborted', async () => {
   const controller = new AbortController();
-  const {result} = runAgent({
+  setTimeout(() => controller.abort(), 50);
+  const {message, record} = await runTurn({
     model: textModel(Array(50).fill('x'), 10),
     messages: [{role: 'user', content: 'hi'}],
     abortSignal: controller.signal,
   });
-  let received = '';
-  setTimeout(() => controller.abort(), 50);
-  for await (const delta of result.textStream) received += delta;
+  const received = (message.parts.find(p => p.type === 'text') as {text: string} | undefined)?.text ?? '';
+  expect(record.status).toBe('stopped');
   expect(received.length).toBeGreaterThan(0);
   expect(received.length).toBeLessThan(50);
 });
@@ -61,7 +63,7 @@ test('routes models to their provider and rejects mismatches', () => {
 
 test('accepts only well-formed credentials', () => {
   expect(parseCredential({provider: 'openai', kind: 'api-key', apiKey: 'k'})).toEqual({provider: 'openai', kind: 'api-key', apiKey: 'k'});
-  expect(parseCredential({provider: 'openai', kind: 'oauth', accessToken: 't', expiresAt: 1})?.kind).toBe('oauth');
+  expect(parseCredential({provider: 'openai', kind: 'oauth', accessToken: 't', expiresAt: 1})).toBeNull();
   expect(parseCredential({provider: 'openai', kind: 'api-key', apiKey: ''})).toBeNull();
   expect(parseCredential({provider: 'anthropic', kind: 'api-key', apiKey: 'k'})).toBeNull();
   expect(parseCredential(null)).toBeNull();
@@ -78,6 +80,6 @@ test('stops at the configured step limit when the model keeps calling tools', as
       }),
     }),
   });
-  const {result} = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
-  expect((await result.steps).length).toBe(AGENT_CONFIG.maxSteps);
+  await runTurn({model, messages: [{role: 'user', content: 'hi'}]});
+  expect(model.doStreamCalls.length).toBe(AGENT_CONFIG.maxSteps);
 });
