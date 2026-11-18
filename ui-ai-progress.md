@@ -91,6 +91,7 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - Checked in the browser: there are 3 expandable rows (input-streaming has no detail); clicking expanded two, giving `aria-expanded` `false,true,true`. The keyboard focus ring shows on the running row. No computed borders in the expanded detail. No console errors.
   - Screenshots, checked by eye: `.screenshots/ai-05-tools-light.png` and `.screenshots/ai-05-tools-dark.png`, showing all 4 tool states (done and error expanded), all 3 denial reasons, and an error row for contrast.
   - `bun run typecheck`: exit 0 on two clean runs. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
+  - Orchestrator review fix: Astryx's `CodeBlock` drew an outline and a line under its header. `components/ai/Code.tsx` now wraps `CodeBlock` with `container="section"` (no outline) and `hasLanguageLabel={false}` (no header, so no line), plus a muted tone through `xstyle`. The tool rows, the dev page and the coming approval card and diff view all use it. Checked: no `<pre>` in a code block, or anything inside one, draws a border, pseudo-elements included (16 `<pre>` on the page). Re-shot `.screenshots/ai-05-tools-{light,dark}.png`.
   - Astryx note: `ChatToolCalls` rows are `div role="button"` with key handling, not `<button>`. They are keyboard-usable and expose `aria-expanded`.
 - [ ] Approval card.
 - [ ] Verify result and diff view.

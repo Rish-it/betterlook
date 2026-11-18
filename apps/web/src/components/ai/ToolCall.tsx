@@ -1,10 +1,8 @@
 import type {DynamicToolUIPart, ToolUIPart} from 'ai';
-import * as stylex from '@stylexjs/stylex';
 import {ChatToolCalls, type ChatToolCallStatus} from '@astryxdesign/core/Chat';
-import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import {VStack} from '@astryxdesign/core/Layout';
 import {Text} from '@astryxdesign/core/Text';
-import {colorVars} from '@astryxdesign/core/theme/tokens.stylex';
+import {Code} from './Code';
 import {summarizeArgs} from './summarize';
 
 export type ToolPart = ToolUIPart | DynamicToolUIPart;
@@ -18,10 +16,6 @@ const STATUS: Record<ToolPart['state'], ChatToolCallStatus> = {
   'output-error': 'error',
   'output-denied': 'error',
 };
-
-const styles = stylex.create({
-  code: {borderColor: 'transparent', boxShadow: 'none', backgroundColor: colorVars['--color-background-muted']},
-});
 
 const toolName = (part: ToolPart) => (part.type === 'dynamic-tool' ? part.toolName : part.type.slice(5));
 
@@ -38,7 +32,7 @@ function Detail({label, value}: {label: string; value: unknown}) {
       <Text type="supporting" color="secondary">
         {label}
       </Text>
-      <CodeBlock code={code} language={typeof value === 'string' ? 'text' : 'json'} maxHeight={240} xstyle={styles.code} />
+      <Code code={code} language={typeof value === 'string' ? 'text' : 'json'} />
     </VStack>
   );
 }

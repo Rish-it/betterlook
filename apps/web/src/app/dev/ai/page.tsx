@@ -6,8 +6,8 @@ import {notFound} from 'next/navigation';
 import * as stylex from '@stylexjs/stylex';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {VStack} from '@astryxdesign/core/Layout';
-import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import * as f from '@/components/ai/fixtures';
+import {Code} from '@/components/ai/Code';
 import {Conversation} from '@/components/ai/Conversation';
 import {Message} from '@/components/ai/Message';
 import {ToolCall} from '@/components/ai/ToolCall';
@@ -16,7 +16,6 @@ import {Composer} from '@/composer/Composer';
 
 const styles = stylex.create({
   main: {maxWidth: 880, marginInline: 'auto', padding: 16, paddingBlockEnd: 96},
-  borderless: {borderColor: 'transparent', boxShadow: 'none'},
   chatFrame: {height: 560, display: 'flex', flexDirection: 'column'},
 });
 
@@ -32,7 +31,7 @@ function State({label, children}: {label: string; children: ReactNode}) {
 }
 
 function Fixture({value}: {value: unknown}) {
-  return <CodeBlock language="json" code={JSON.stringify(value, null, 2)} maxHeight={240} xstyle={styles.borderless} />;
+  return <Code language="json" code={JSON.stringify(value, null, 2)} />;
 }
 
 function Section({title, children}: {title: string; children: ReactNode}) {
@@ -136,7 +135,7 @@ export default function AiDevPage() {
 
         <Section title="Diff view">
           <State label={f.turnFiles.join(', ')}>
-            <CodeBlock language="diff" code={f.turnDiff} maxHeight={240} xstyle={styles.borderless} />
+            <Code language="diff" code={f.turnDiff} />
           </State>
         </Section>
 
