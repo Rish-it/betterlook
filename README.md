@@ -47,6 +47,7 @@ Designers bring their own model keys in the app. Those keys are never logged, tr
 | `bun --cwd apps/web build` | Production build |
 | `bun run db:migrate` | Apply Supabase migrations with drizzle-kit |
 | `bun run agent:run` | Run tasks from a Markdown task file through the agent in fresh sandboxes |
+| `bun run eval` | Run the benchmark and score it (see Evals) |
 
 ## How a turn works
 
@@ -80,15 +81,15 @@ The specification is `evals/EVALS.md` (SHA-256 `36d8f183d42c9b3c35c347fa429774c4
 **Three triggers share one check library** (`apps/web/src/lib/evals`):
 
 - **A. Every live turn:** built. Inside verify, in the same browser session, the turn is scored on E2 (hero and file scope), E3, E4, E5, E6 and the E7 pre-check; E1 and E8 do not apply to live turns. No model call happens during the turn. Scores attach to the turn's Langfuse trace after the response, and the added verify time is recorded as `addedVerifyMs`. 5% of live turns are sent to the E7 judge afterwards, without blocking.
-- **B. Benchmark CLI:** in progress. `bun run eval --tasks evals/tasks/v1.md --runs <k> --model <id>` will run every task through the agent in a fresh sandbox per trial, score E1–E8, and record a Langfuse dataset and one experiment per model.
-- **C. GitHub Action:** not built yet. It will run the `regression` tasks once per change to the agent or eval code, with code checks only, against a main baseline.
+- **B. Benchmark CLI:** built, not yet run. `bun run eval --tasks evals/tasks/v1.md --runs <k> --model <id>` runs every task through the agent in a fresh sandbox per trial (at most 3 at once, with backoff on rate limits), scores E1–E8, and records a Langfuse dataset from the frozen tasks plus one experiment per model with trace-linked scores. Records are sanitized and scanned for secrets and canaries before anything is published. Flags: `--tag regression`, `--no-judge`, `--max-usd <n>`, `--baseline <summary.json>`, `--concurrency <n>`, `--out <dir>`, `--dry-run` (plans the runs from local files, with no model call, sandbox or Langfuse write). `bun run eval --annotation-queue` creates the E7 calibration queue. Exit codes: 1 setup blocked, 2 E8 high-severity hit, 3 sanitization blocked, 4 new E1/E2 failure against the main baseline.
+- **C. GitHub Action:** built (`.github/workflows/evals.yml`). On non-fork pull requests and pushes to `main` that touch `lib/agent/**`, `lib/evals/**`, the starter, `scripts/eval.ts` or `evals/**`, it runs the `regression` tasks once per model with code checks only (no judge) and a $2 spend cap per model. Pushes to `main` store the baseline; pull requests compare against it, and a missing baseline makes the comparison `NOT_EVALUATED`. It needs the repository secrets `ANTHROPIC_EVAL_API_KEY`, `VERCEL_TOKEN`, `VERCEL_TEAM_ID` and `VERCEL_PROJECT_ID`; without them it exits as setup blocked.
 
 **E7 judge.** It uses the spec's instruction word for word and stores its SHA-256 and the resolved model ID. It runs on `OPENAI_EVAL_API_KEY` when set; otherwise on `claude-haiku-5-5`, marked `same_family: true`. Human labels are collected separately and are never filled in automatically.
 
-**Config hash.** Every scored run records a config hash over the system and repair prompts, the agent config, the tool definitions, the `DESIGN.md` hash, the judge instruction hash and the evaluator version.
+**Config hash.** Every scored run records a config hash over the system and repair prompts, the agent config, the tool definitions, the `DESIGN.md` hash, the judge instruction hash and the evaluator version. Current config hash (SHA-256): `c2c606b14cffed75694742d65f6d66a7fb0685a8280f8080dec2706530b78f95`.
 
 **Progress** is tracked item by item, with proof, in `eval-progress.md`.
 
 ### Baseline scores
 
-Not run yet. The benchmark (Claude Haiku 5.5 ×5 and Claude Sonnet 5.5 ×2 on the 12 tasks, 84 runs) waits for the CLI. Results will be added here from real runs only, with denominators; anything that does not run will be listed as `NOT_EVALUATED` with its reason. The baseline will run with an empty system prompt plus `DESIGN.md` as project context.
+Not run yet. The benchmark (Claude Haiku 5.5 ×5 and Claude Sonnet 5.5 ×2 on the 12 tasks, 84 runs) is built and has not been executed; `eval-progress.md` lists the commands to run it, starting with a one-run smoke test. Results will be added here from real runs only, with denominators; anything that does not run will be listed as `NOT_EVALUATED` with its reason. The baseline will run with an empty system prompt plus `DESIGN.md` as project context.
