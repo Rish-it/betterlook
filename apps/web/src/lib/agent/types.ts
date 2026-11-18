@@ -22,7 +22,7 @@ export interface ToolCallRecord {
   tool: string;
   args: unknown;
   result: unknown;
-  decision: 'allowed' | 'denied' | 'approved';
+  decision: 'allowed' | 'denied' | 'approved' | 'cancelled';
   denied?: DeniedCall;
   startedAt: string;
   durationMs: number;

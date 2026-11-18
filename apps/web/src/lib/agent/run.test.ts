@@ -5,7 +5,9 @@ import {MockLanguageModelV4} from 'ai/test';
 import {AGENT_CONFIG} from './config';
 import {languageModel, parseCredential} from './model';
 import {MODELS, providerOf} from './models';
+import type {AgentChunk} from './run';
 import {runTurn, tempProject, textStep, toolStep} from './test-project';
+import type {AgentMessage} from './types';
 
 const usage = {
   inputTokens: {total: 3, noCache: 3, cacheRead: undefined, cacheWrite: undefined},
@@ -126,6 +128,81 @@ test('the turn record keeps each step finish reason and output tokens, and count
       {finishReason: 'length', outputTokens: 32_000},
     ]);
     expect(record.lengthStops).toBe(1);
+  } finally {
+    t.cleanup();
+  }
+});
+
+const unresolvedParts = (message: AgentMessage) =>
+  message.parts.filter(p => (p.type.startsWith('tool-') || p.type === 'dynamic-tool') && !['output-available', 'output-error', 'output-denied'].includes((p as {state: string}).state));
+
+const cancelled = (chunks: AgentChunk[], toolCallId: string) =>
+  chunks.find(c => (c.type === 'tool-output-error' || c.type === 'tool-input-error') && c.toolCallId === toolCallId) as {errorText: string} | undefined;
+
+test('Stop cancels a running tool call with a reason, in the stream and the record', async () => {
+  const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'});
+  const slow = {...t.project, read: async (p: string) => (await Bun.sleep(300), t.project.read(p))};
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 100);
+  const model = new MockLanguageModelV4({doStream: [toolStep([['r1', 'read_file', {path: 'src/App.tsx'}]]), textStep('never')]});
+  try {
+    const {chunks, message, record} = await runTurn({model, messages: [{role: 'user', content: 'read it'}], project: slow, abortSignal: controller.signal});
+    expect(record.status).toBe('stopped');
+    expect(cancelled(chunks, 'r1')?.errorText).toStartWith('Cancelled: ');
+    expect(record.toolCalls.find(c => c.id === 'r1')).toMatchObject({decision: 'cancelled', result: cancelled(chunks, 'r1')?.errorText});
+    expect(unresolvedParts(message)).toEqual([]);
+  } finally {
+    await Bun.sleep(300);
+    t.cleanup();
+  }
+});
+
+test('a model error mid tool input cancels the call instead of leaving it pending', async () => {
+  const model = new MockLanguageModelV4({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        chunks: [
+          {type: 'tool-input-start' as const, id: 'w1', toolName: 'write_file'},
+          {type: 'tool-input-delta' as const, id: 'w1', delta: '{"path":"a.txt","con'},
+          {type: 'error' as const, error: new Error('connection reset')},
+        ],
+      }),
+    }),
+  });
+  const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'});
+  try {
+    const {chunks, message, record} = await runTurn({model, messages: [{role: 'user', content: 'write it'}], project: t.project});
+    expect(record.status).toBe('error');
+    expect(cancelled(chunks, 'w1')?.errorText).toStartWith('Cancelled: ');
+    expect(record.toolCalls).toMatchObject([{id: 'w1', tool: 'write_file', decision: 'cancelled'}]);
+    expect(unresolvedParts(message)).toEqual([]);
+  } finally {
+    t.cleanup();
+  }
+});
+
+test('calls the model ended without running are cancelled before the turn checkpoints and verifies', async () => {
+  const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'}, cmd => (cmd === 'node' ? {exitCode: 0, output: '[]'} : {exitCode: 0, output: ''}));
+  const unrun = {
+    stream: simulateReadableStream({
+      chunks: [
+        {type: 'tool-call' as const, toolCallId: 'w2', toolName: 'write_file', input: JSON.stringify({path: 'b.txt', content: 'b'})},
+        {type: 'finish' as const, finishReason: {unified: 'other' as const, raw: undefined}, logprobs: undefined, usage},
+      ],
+    }),
+  };
+  const model = new MockLanguageModelV4({doStream: [toolStep([['w1', 'write_file', {path: 'a.txt', content: 'a'}]]), unrun]});
+  try {
+    const {chunks, message, record} = await runTurn({model, messages: [{role: 'user', content: 'write two'}], project: t.project});
+    const at = (match: (c: AgentChunk) => boolean) => chunks.findIndex(match);
+    expect(cancelled(chunks, 'w2')?.errorText).toStartWith('Cancelled: ');
+    expect(at(c => c.type === 'tool-output-error' && c.toolCallId === 'w2')).toBeLessThan(at(c => c.type === 'data-checkpoint'));
+    expect(at(c => c.type === 'data-checkpoint')).toBeGreaterThan(-1);
+    expect(record.toolCalls.map(c => [c.id, c.decision])).toEqual([
+      ['w1', 'allowed'],
+      ['w2', 'cancelled'],
+    ]);
+    expect(unresolvedParts(message)).toEqual([]);
   } finally {
     t.cleanup();
   }
