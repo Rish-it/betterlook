@@ -30,6 +30,8 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
   **types.ts draft:** committed as `apps/web/src/lib/agent/types.ts` (the real file).
 
+  Evidence: `bun install --frozen-lockfile` (lockfile unchanged), then `bun run typecheck` run 1: pass, run 2: pass. No `.env` exists yet, so there is no secret to grep for.
+
 - [ ] Agent core, text only: lib/agent/types.ts committed; runAgent() streams replies into the chat panel; model picker, stop button and step limit work.
 - [ ] BYOK: the key flows the way the founder picked; missing or wrong key shows a clear message.
 - [ ] Turn record and tracing: each turn lands in Langfuse with the required fields; prompt and tool config hashes change on edit; no secret appears in an exported trace.
