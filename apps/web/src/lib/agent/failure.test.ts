@@ -1,10 +1,10 @@
 /// <reference types="bun" />
 import {afterEach, beforeEach, expect, spyOn, test} from 'bun:test';
 import {APICallError} from 'ai';
-import {MockLanguageModelV4} from 'ai/test';
+import {convertArrayToReadableStream, MockLanguageModelV4} from 'ai/test';
 import {POST as chatPOST} from '@/app/api/chat/route';
 import {AGENT_CONFIG} from './config';
-import {PROVIDER_FAILED, RATE_LIMITED, SANDBOX_FAILED, STEP_LIMIT, VERIFY_FAILED} from './errors';
+import {PROVIDER_FAILED, RATE_LIMITED, REFUSED, SANDBOX_FAILED, STEP_LIMIT, VERIFY_FAILED} from './errors';
 import {runTurn, tempProject, textStep, toolStep} from './test-project';
 
 const cleanups: (() => void)[] = [];
@@ -53,6 +53,20 @@ test('provider error: a readable message without the provider text', async () =>
   expect(chunks).toContainEqual({type: 'error', errorText: PROVIDER_FAILED});
   expect(JSON.stringify(chunks)).not.toContain('provider says no');
   expect(message.metadata).toMatchObject({status: 'error', notice: PROVIDER_FAILED});
+  await expectChatStillWorks();
+});
+
+test('refusal: a readable notice, no checkpoint or verify, and the next turn works', async () => {
+  const refusal = {
+    stream: convertArrayToReadableStream([
+      {type: 'finish' as const, finishReason: {unified: 'content-filter' as const, raw: 'refusal'}, usage: {inputTokens: {total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined}, outputTokens: {total: 0, text: 0, reasoning: undefined}}},
+    ]),
+  };
+  const {chunks, message, record} = await runTurn({model: new MockLanguageModelV4({doStream: [refusal]}), messages: ask(), project: project().project});
+  expect(record).toMatchObject({status: 'error', error: REFUSED, checkpoint: null, verify: null});
+  expect(chunks.some(c => c.type === 'data-verify' || c.type === 'data-checkpoint')).toBe(false);
+  expect(chunks.at(-1)?.type).toBe('finish');
+  expect(message.metadata).toMatchObject({status: 'error', notice: REFUSED});
   await expectChatStillWorks();
 });
 

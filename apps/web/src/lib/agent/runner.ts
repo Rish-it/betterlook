@@ -9,7 +9,7 @@ import {RUNNER_CONFIG} from './config';
 import {RATE_LIMITED} from './errors';
 import {runAgent} from './run';
 import {maskSecrets} from './trace';
-import type {ProviderCredential, TurnStatus} from './types';
+import type {ProviderCredential, ProviderId, TurnStatus} from './types';
 
 export type Task = {id: string; prompt: string} & Record<string, unknown>;
 export type RunSummary = {taskId: string; run: number; status: TurnStatus; attempts: number; dir: string};
@@ -35,10 +35,12 @@ export function parseTasks(value: unknown): Task[] {
   });
 }
 
-export function evalCredential(env: Record<string, string | undefined>): ProviderCredential {
-  const apiKey = env.OPENAI_EVAL_API_KEY;
-  if (!apiKey) throw new Error('Set OPENAI_EVAL_API_KEY in apps/web/.env. The runner never uses a user key.');
-  return {provider: 'openai', kind: 'api-key', apiKey};
+const EVAL_KEYS: Record<ProviderId, string> = {openai: 'OPENAI_EVAL_API_KEY', anthropic: 'ANTHROPIC_EVAL_API_KEY'};
+
+export function evalCredential(provider: ProviderId, env: Record<string, string | undefined>): ProviderCredential {
+  const apiKey = env[EVAL_KEYS[provider]];
+  if (!apiKey) throw new Error(`Set ${EVAL_KEYS[provider]} in apps/web/.env. The runner never uses a user key.`);
+  return {provider, kind: 'api-key', apiKey};
 }
 
 const SHOT = `${CHECKER_DIR}/preview.png`;

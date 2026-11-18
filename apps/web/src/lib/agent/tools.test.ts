@@ -81,7 +81,7 @@ test('allowed tools run in the project; a call outside it is denied, logged, rec
   const secondPrompt = JSON.stringify(model.doStreamCalls[1].prompt);
   expect(secondPrompt).toContain('../../etc/passwd is outside the project folder.');
   expect(secondPrompt).toContain('Edited src/App.tsx.');
-  expect(model.doStreamCalls[0].providerOptions).toEqual({openai: {store: false, promptCacheKey: 'sbx-local'}});
+  expect(model.doStreamCalls[0].providerOptions).toEqual({openai: {store: false, promptCacheKey: 'sbx-local'}, anthropic: {fallbacks: 'default'}});
 });
 
 async function pauseThenAnswer(approved: boolean) {

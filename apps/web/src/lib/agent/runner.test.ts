@@ -62,8 +62,10 @@ test('task files are a JSON array of {id, prompt} and extra fields pass through 
 });
 
 test('the runner only ever uses the eval key', () => {
-  expect(evalCredential({OPENAI_EVAL_API_KEY: 'eval'})).toEqual({provider: 'openai', kind: 'api-key', apiKey: 'eval'});
-  expect(() => evalCredential({OPENAI_API_KEY: 'someone-elses'})).toThrow('Set OPENAI_EVAL_API_KEY');
+  expect(evalCredential('openai', {OPENAI_EVAL_API_KEY: 'eval'})).toEqual({provider: 'openai', kind: 'api-key', apiKey: 'eval'});
+  expect(() => evalCredential('openai', {OPENAI_API_KEY: 'someone-elses'})).toThrow('Set OPENAI_EVAL_API_KEY');
+  expect(evalCredential('anthropic', {ANTHROPIC_EVAL_API_KEY: 'eval-a'})).toEqual({provider: 'anthropic', kind: 'api-key', apiKey: 'eval-a'});
+  expect(() => evalCredential('anthropic', {ANTHROPIC_API_KEY: 'x', OPENAI_EVAL_API_KEY: 'y'})).toThrow('Set ANTHROPIC_EVAL_API_KEY');
 });
 
 test('k runs per task go through runAgent, stay under the concurrency cap and each leave a complete folder', async () => {

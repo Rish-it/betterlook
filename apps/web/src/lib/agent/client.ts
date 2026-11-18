@@ -1,13 +1,14 @@
 import {Chat} from '@ai-sdk/react';
 import {DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses} from 'ai';
-import type {AgentMessage, ProviderCredential} from './types';
+import {providerOf} from './models';
+import type {AgentMessage, ProviderCredential, ProviderId} from './types';
 
 export function createAgentChat({
   getCredential,
   getSandboxId,
   messages,
 }: {
-  getCredential: () => ProviderCredential | null;
+  getCredential: (provider: ProviderId) => ProviderCredential | null;
   getSandboxId: () => string | null;
   messages?: AgentMessage[];
 }) {
@@ -15,7 +16,10 @@ export function createAgentChat({
     messages,
     transport: new DefaultChatTransport<AgentMessage>({
       api: '/api/chat',
-      body: () => ({credential: getCredential(), sandboxId: getSandboxId()}),
+      prepareSendMessagesRequest: ({id, messages, body, trigger, messageId}) => {
+        const provider = providerOf(body?.model);
+        return {body: {...body, id, messages, trigger, messageId, credential: provider && getCredential(provider), sandboxId: getSandboxId()}};
+      },
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   });
