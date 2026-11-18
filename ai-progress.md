@@ -45,6 +45,7 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 ## types.ts changes
 
 - v1 (Plan item): `ProviderCredential` (`api-key` | `oauth` with `accessToken`), `ProviderId`, `ToolName`, `DeniedCall`, `ToolCallRecord`, `VerifyCheck`, `VerifyResult`, `Checkpoint`, `Usage`, `TurnStatus`, `TurnRecord`, `TurnEvent` (restore, keep, approve, deny). AUTH: an OAuth token goes in `{kind: 'oauth', accessToken}`; `ProviderId` widens when a second provider lands.
+- Dependency (orchestrator request, 2026-11-18): `ai@7.0.176` (exact) added to `apps/web/package.json`. This is **v7**, not v5: npm `latest` is 7.0.176, and v5 (5.0.291) and v6 are maintenance tags. `import type {UIMessage, ToolUIPart} from 'ai'` typechecks. The founder's brief named v5; the APIs it names (`streamText`, tools, `stopWhen` + `stepCountIs`, `useChat`) carry through v7, and `useChat` comes from `@ai-sdk/react`, which lands with the Agent core item. No provider package or sandbox SDK added. Evidence: `bun run typecheck` run 1: pass, run 2: pass.
 
 ## Questions for the founder
 
