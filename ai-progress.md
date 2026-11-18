@@ -153,6 +153,8 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
 - Checkpoint item, types: `Checkpoint.parentId` (the commit before the turn, so "undo this turn" is a restore to `parentId`), and every `TurnEvent` gets an optional `traceId`, so events land in the turn's Langfuse trace.
 
+- AUTH fold-in (orchestrator): merged `betterlook` (18533f49, merge `25db853e`). `/api/chat` imports the real `getServerCredential` from `@/lib/auth/server` (stub deleted). `parseCredential` accepts only `{provider: 'openai', kind: 'api-key', apiKey}` from the request body; an `oauth` credential in the body is rejected with the missing-key 401, so OAuth only comes from the session cookie. Tested in `app/api/chat/route.test.ts`.
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:

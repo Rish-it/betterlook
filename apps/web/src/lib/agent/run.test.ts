@@ -61,7 +61,7 @@ test('routes models to their provider and rejects mismatches', () => {
 
 test('accepts only well-formed credentials', () => {
   expect(parseCredential({provider: 'openai', kind: 'api-key', apiKey: 'k'})).toEqual({provider: 'openai', kind: 'api-key', apiKey: 'k'});
-  expect(parseCredential({provider: 'openai', kind: 'oauth', accessToken: 't', expiresAt: 1})?.kind).toBe('oauth');
+  expect(parseCredential({provider: 'openai', kind: 'oauth', accessToken: 't', expiresAt: 1})).toBeNull();
   expect(parseCredential({provider: 'openai', kind: 'api-key', apiKey: ''})).toBeNull();
   expect(parseCredential({provider: 'anthropic', kind: 'api-key', apiKey: 'k'})).toBeNull();
   expect(parseCredential(null)).toBeNull();

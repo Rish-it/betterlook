@@ -1,12 +1,10 @@
 import {convertToModelMessages, createUIMessageStreamResponse} from 'ai';
 import {languageModel, parseCredential, providerOf} from '@/lib/agent/model';
 import {agentUIStream} from '@/lib/agent/run';
-import type {AgentMessage, ProviderCredential} from '@/lib/agent/types';
+import type {AgentMessage} from '@/lib/agent/types';
+import {getServerCredential} from '@/lib/auth/server';
 import type {Project} from '@/lib/sandbox/project';
 import {openProject, sandboxConfigured} from '@/lib/sandbox/sandbox';
-
-// Stub until AUTH's lib/auth/server.ts lands on betterlook; replace with its import.
-const getServerCredential = async (_req: Request): Promise<ProviderCredential | null> => null;
 
 export async function POST(req: Request) {
   const body: {messages: AgentMessage[]; model: string; credential: unknown; sandboxId?: string | null} = await req.json();

@@ -14,16 +14,10 @@ export function languageModel(modelId: string, credential: ProviderCredential) {
   return createOpenAI({apiKey: token})(modelId);
 }
 
+// Body credentials are API keys only; an OAuth token must come from the server-side session cookie.
 export function parseCredential(value: unknown): ProviderCredential | null {
   if (typeof value !== 'object' || value === null) return null;
   const c = value as Record<string, unknown>;
-  if (c.provider !== 'openai') return null;
-  if (c.kind === 'api-key' && typeof c.apiKey === 'string' && c.apiKey) {
-    return {provider: c.provider, kind: c.kind, apiKey: c.apiKey};
-  }
-  if (c.kind === 'oauth' && typeof c.accessToken === 'string' && c.accessToken) {
-    const expiresAt = typeof c.expiresAt === 'number' ? c.expiresAt : undefined;
-    return {provider: c.provider, kind: c.kind, accessToken: c.accessToken, expiresAt};
-  }
-  return null;
+  if (c.provider !== 'openai' || c.kind !== 'api-key' || typeof c.apiKey !== 'string' || !c.apiKey) return null;
+  return {provider: c.provider, kind: c.kind, apiKey: c.apiKey};
 }
