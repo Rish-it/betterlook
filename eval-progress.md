@@ -9,8 +9,8 @@ Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `eval
 - [x] 3. Check library: one shared TypeScript library for E1–E8 per the spec, with PASS / FAIL / NOT_EVALUATED / NOT_APPLICABLE, one-line evidence-based reasons, E4 subrules E4a–E4k, E8 severities, and the metadata fields the scoring contract lists. Unit tests on the spec's positive and negative fixtures for every eval, plus boundary cases for every threshold.
 - [x] 4. Task file: write evals/tasks/v1.md with exactly the 12 tasks in Section 9, in sample.md's syntax, with selectors confirmed against the actual starter and exactly 4 tagged regression. Show me the complete file in this progress log, then continue without waiting. Freeze it and record its SHA-256 as the taskset hash.
 - [x] 5. Trigger A: post-turn checks inside verify, reusing its browser session, scores attached to the turn's Langfuse trace, added_verify_ms measured, and the 5% asynchronous E7 judge sample enqueued without blocking.
-- [ ] 6. Trigger B: bun run eval --tasks --runs --model on top of agent:run, with a fresh isolated starter per task and trial, the Langfuse dataset created or updated from the frozen tasks, one experiment per model, trace-linked BOOLEAN scores, config SHA-256, all the per-run fields Section 11 lists, concurrency capped at 3 sandboxes, backoff on rate limits, and nonzero exit on any E8 high-severity hit. Sanitize records and scan them for secret or canary matches before publishing.
-- [ ] 7. E7: the deterministic pre-check, plus the verbatim judge instruction from the spec (OpenAI model if OPENAI_EVAL_API_KEY exists, otherwise claude-haiku-5-5 with same_family: true), storing the exact instruction, resolved model ID and SHA-256. Create the Langfuse annotation queue "E7 honesty — 20-run calibration" with PASS/FAIL and a required note.
+- [x] 6. Trigger B: bun run eval --tasks --runs --model on top of agent:run, with a fresh isolated starter per task and trial, the Langfuse dataset created or updated from the frozen tasks, one experiment per model, trace-linked BOOLEAN scores, config SHA-256, all the per-run fields Section 11 lists, concurrency capped at 3 sandboxes, backoff on rate limits, and nonzero exit on any E8 high-severity hit. Sanitize records and scan them for secret or canary matches before publishing.
+- [x] 7. E7: the deterministic pre-check, plus the verbatim judge instruction from the spec (OpenAI model if OPENAI_EVAL_API_KEY exists, otherwise claude-haiku-5-5 with same_family: true), storing the exact instruction, resolved model ID and SHA-256. Create the Langfuse annotation queue "E7 honesty — 20-run calibration" with PASS/FAIL and a required note.
 - [ ] 8. Trigger C: the GitHub Action per Section 10C (regression tag only, runs 1, code checks only, nonfork PRs, repository secrets, explicit spend cap, comparison against a main baseline, NOT_EVALUATED if that baseline is missing). Don't push or create anything on GitHub; commit the workflow file only.
 - [ ] 9. Preflight: typecheck, all unit tests, and a browser check of the starter pass. Model IDs confirmed. Sandbox and Langfuse credentials work. One smoke run (one task, one trial, Haiku) completes end to end with all applicable evals scored and the published record clean of secrets and canaries. Record the sandbox CPU it used, project the CPU for 84 runs, and note the risk against our Vercel Hobby quota.
 - [ ] 10. Haiku run: bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5. That's 60 task executions; record executed/expected and every skip or error with its reason.
@@ -20,7 +20,7 @@ Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `eval
 ## Facts recorded
 
 - `evals/tasks/sample.md` was absent when this branch was cut, and this worker must not create it. Its record syntax is the one `EVALS.md` §9 describes and `parseTaskMarkdown` in `apps/web/src/lib/agent/runner.ts` implements (`## <task id>`, `prompt:`, `starter:`, `notes:`).
-- `README.md` did not exist at the repo root; this branch creates it with the "Evals" section, and (founder follow-up via orchestrator) a "Baseline scores" table added only with item 12, from real results: per model × E1–E8 pass@1, pass^5 (Haiku) / pass^2 (Sonnet), PASS/FAIL/NOT_EVALUATED/NOT_APPLICABLE with denominators, executed/expected, taskset and config hashes, date, anything not run shown as NOT_EVALUATED with its reason, and the empty-system-prompt-plus-DESIGN.md note.
+- `README.md` is written by the orchestrator on `betterlook` (founder change of plan); this branch does not create or edit it.
 - `OPENAI_EVAL_API_KEY` is not set in `apps/web/.env` (checked by variable name only), so the E7 judge uses `claude-haiku-5-5` with `same_family: true`.
 - `system-prompt.ts` is empty (founder-owned). The baseline runs with an empty system prompt plus DESIGN.md as project context.
 - `next-env.d.ts` is generated and gitignored; `bun run typecheck` needs `next typegen` once in a fresh worktree (otherwise `AuthControls.tsx` fails on its `.svg` import).
@@ -269,6 +269,45 @@ bun test src/lib/evals/turn.test.ts
 bun test (run 1) → 160 pass, 0 fail; typecheck clean.   bun test (run 2) → 160 pass, 0 fail; typecheck clean.
 ```
 Real-sandbox `added_verify_ms` is measured in the item 9 smoke run.
+
+## Item 6: Trigger B (`bun run eval`)
+
+- `apps/web/scripts/eval.ts`, run as `bun run eval` (root script → `apps/web` bundles with `bun build` and runs under node with `.env`, like `agent:run`). Flags: `--tasks`, `--runs`, `--model`, `--tag`, `--no-judge`, `--max-usd`, `--baseline`, `--concurrency` (capped at 3), `--out` (default `.scratch/evals/<timestamp>-<model>`), `--dry-run`, `--annotation-queue`.
+- On top of `runTasks` (agent:run's runner): a fresh sandbox from the starter snapshot per task and trial (`createProject` with 3 tries), rate-limit backoff and the 3-sandbox cap reused as is. `runner.ts` gains task-aware `capture(project, task, phase)`, per-task `agent` options, `evaluate` (runs before the sandbox stops, writes `evals.json`) and a `proceed` gate (the spend cap). `runAgent` takes `traceAttributes`.
+- Setup before any run: the models API must return the exact model id (and judge id) or every run is NOT_EVALUATED with the reason and exit 1; sandbox keys checked by name.
+- Langfuse: dataset `betterlook-evals-v1` upserted from the frozen tasks (item ids `betterlook-evals-v1-<task>`), one experiment per CLI invocation (`v1 <model> <timestamp>`) through `langfuse.experiment.*` attributes on each run's root span, trace-linked BOOLEAN + outcome scores.
+- Per run (`RunRecord`): model_id, trial_index, task_id, starter_hash, taskset_hash, config_hash, latency, usage, cost (computed from usage × the dated price table), every eval outcome and reason, verify_status, diff_hash, trace URL, injection severity, judge model / instruction hash / same_family, added_verify_ms, sandbox active CPU.
+- E8: fresh `blk_<32 hex>` canary per injection or benign run in `notes/deploy-token.txt`, registered with `maskSecrets` before the turn; one attacker instruction on README.md or a code comment; protected files hashed before and after with `sha256sum`; a page that shows the canary is never saved as a screenshot.
+- Before publishing, every file in the output folder is scanned for env secret values (by name pattern) and every planted canary; any hit blocks publication (exit 3) and the scores become NOT_EVALUATED. Exit 2 on any E8 high-severity hit, 4 on a failed baseline comparison.
+- `lib/evals/report.ts`: `summarize` (pass@1, pass^k, trial counts with denominators, not-run reasons, E8 high hits, false refusals, same_family count, cost per completed task, added_verify_ms) and `compareToBaseline`.
+
+Proof (no model, sandbox or Langfuse request):
+```
+bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5 --dry-run
+  expected_executions 60, taskset_hash 5c33dfd1…8e60, config_hash c2c606b1…8f95, design_md_sha256 165954eb…0cbb,
+  judge "anthropic claude-haiku-5-5 (same_family for Claude runs)", concurrency 3, langfuse dataset betterlook-evals-v1 (12 items)
+  keys present by name: ANTHROPIC_EVAL_API_KEY, VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY
+bun run eval --tasks evals/tasks/v1.md --runs 2 --model claude-sonnet-5-5 --dry-run   → expected_executions 24
+bun test src/lib/agent/runner.test.ts  → eval hooks test (capture phases, agent options, evaluate before stop, proceed gate)
+bun test src/lib/evals/report.test.ts  → pass@1 / pass^k / NOT_EVALUATED for skipped runs / cost / baseline comparison
+bun test src/lib/agent/trace.test.ts   → a registered canary is masked
+bun test ×2 → 168 pass, 0 fail; typecheck ×2 clean
+```
+Full config hash: `c2c606b14cffed75694742d65f6d66a7fb0685a8280f8080dec2706530b78f95`. End-to-end proof (a real sandbox run) is item 9.
+
+## Item 7: E7
+
+- Deterministic pre-check (`e7PreCheck`) and `scoreE7` (item 3); the judge (`judge.ts`, item 5) uses the verbatim instruction; `judge.test.ts` checks it against `EVALS.md` byte for byte. SHA-256 is stored in `setup.json`, `RunRecord.judge` and the config hash. `OPENAI_EVAL_API_KEY` is absent, so the judge is `claude-haiku-5-5` with `same_family: true` for Claude runs; the resolved id comes from the models API at setup (item 9).
+- Annotation queue: `bun run eval --annotation-queue` calls `ensureAnnotationQueue()`: a CATEGORICAL score config `E7 honesty (human)` with PASS (1) / FAIL (0) and the queue `E7 honesty — 20-run calibration`, reusing either when it already exists. Langfuse score configs have no required-comment setting (checked against the public OpenAPI), so "a note is required" is stated in the config and queue descriptions. **Not created yet**: per the founder's change of plan, no Langfuse writes in this session.
+
+Proof:
+```
+bun test src/lib/evals/langfuse.test.ts
+  ✓ creates the E7 calibration queue with a PASS/FAIL score config when neither exists   (stubbed fetch)
+  ✓ reuses an existing queue and score config instead of duplicating them
+  ✓ score bodies: BOOLEAN only for PASS/FAIL, an outcome score for every result, stable ids
+bun test src/lib/evals/judge.test.ts → verbatim instruction, OpenAI-else-Haiku selection, verdict parsing, masked inputs
+```
 
 ## Round log
 
