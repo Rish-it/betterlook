@@ -25,3 +25,9 @@ export const hasThought = (part: ReasoningUIPart) => part.text.trim() !== '';
 
 // Every cancelled call's errorText starts with "Cancelled: " (lib/agent/errors.ts).
 export const cancelReason = (part: ToolPart) => (part.state === 'output-error' && part.errorText.startsWith('Cancelled: ') ? part.errorText : undefined);
+
+// A saved diff or checkpoint means a reopened chat already built something.
+export const startedBuilding = (messages: AgentMessage[]) =>
+  messages.some(m =>
+    m.parts.some(p => p.type === 'data-diff' || p.type === 'data-checkpoint' || (isToolPart(p) && ['write_file', 'edit_file'].includes(toolName(p)))),
+  );

@@ -3,6 +3,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {HStack} from '@astryxdesign/core/Layout';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
+import {Tab, TabList} from '@astryxdesign/core/TabList';
 import {Text} from '@astryxdesign/core/Text';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
 
@@ -21,24 +22,39 @@ function RefreshGlyph(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-type PreviewToolbarProps = {url: string; status: 'loading' | 'ready' | 'error'; message?: string; onRefresh(): void};
+export type PreviewTab = 'preview' | 'settings';
 
-export function PreviewToolbar({url, status, message = 'Preview', onRefresh}: PreviewToolbarProps) {
+type PreviewToolbarProps = {
+  url: string;
+  status: 'loading' | 'ready' | 'error';
+  message?: string;
+  onRefresh(): void;
+  tab?: PreviewTab;
+  onTabChange?(tab: PreviewTab): void;
+};
+
+export function PreviewToolbar({url, status, message, onRefresh, tab = 'preview', onTabChange}: PreviewToolbarProps) {
   const dot = DOT[status];
   return (
     <Toolbar
       label="Preview"
       size="sm"
       startContent={
-        <HStack gap={2} align="center">
-          <StatusDot variant={dot.variant} label={dot.label} isPulsing={dot.isPulsing} />
-          <Text type="supporting" color="secondary">
-            {message}
-          </Text>
-        </HStack>
+        <TabList role="tablist" value={tab} onChange={next => onTabChange?.(next as PreviewTab)}>
+          <Tab value="preview" label="Preview" panelId="preview-panel" />
+          <Tab value="settings" label="Settings" panelId="settings-panel" />
+        </TabList>
       }
       endContent={
         <>
+          <HStack gap={2} align="center">
+            <StatusDot variant={dot.variant} label={dot.label} isPulsing={dot.isPulsing} />
+            {message && (
+              <Text type="supporting" color="secondary">
+                {message}
+              </Text>
+            )}
+          </HStack>
           <IconButton label="Refresh preview" variant="ghost" size="sm" icon={<Icon icon={RefreshGlyph} />} onClick={onRefresh} />
           <IconButton
             label="Open preview in new tab"
