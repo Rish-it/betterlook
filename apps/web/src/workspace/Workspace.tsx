@@ -4,6 +4,7 @@ import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 're
 import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
+import {Button} from '@astryxdesign/core/Button';
 import {HStack} from '@astryxdesign/core/Layout';
 import {
   ChatMessage,
@@ -18,7 +19,7 @@ import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/token
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/lib/agent/models';
-import {createAgentChat, keepTurn, keyNotice, restoreCheckpoint} from '@/lib/agent/client';
+import {createAgentChat, keepTurn, keyNotice, restoreCheckpoint, retry} from '@/lib/agent/client';
 import type {TurnEvent} from '@/lib/agent/types';
 import {getCredential} from '@/lib/auth/client';
 import {AuthControls} from '@/components/auth/AuthControls';
@@ -159,6 +160,10 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   );
   const send = (text: string, sentModel: string) => {
     if (!isBusy) void deliver(text, sentModel);
+  };
+  const retryTurn = async () => {
+    const notice = await retry(chat, getCredential);
+    setHeld(notice ? {text: '', notice} : undefined);
   };
 
   const started = useRef(false);
@@ -302,6 +307,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
               {error && error.message !== messages.at(-1)?.metadata?.notice && (
                 <ChatMessage sender="assistant">
                   <ChatMessageBubble variant="ghost">{error.message}</ChatMessageBubble>
+                  <Button label="Retry" variant="secondary" size="sm" onClick={retryTurn} />
                 </ChatMessage>
               )}
             </Conversation>

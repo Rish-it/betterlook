@@ -42,6 +42,14 @@ export function createAgentChat({
   });
 }
 
+// Regenerate resends the last user message under its own id, so a retry never appends a second copy.
+export async function retry(chat: Chat<AgentMessage>, getCredential: (provider: ProviderId) => ProviderCredential | null) {
+  const model = chat.messages.findLast(m => m.role === 'user')?.metadata?.model;
+  const notice = await keyNotice(model, getCredential);
+  if (!notice) void chat.regenerate({body: {model}});
+  return notice;
+}
+
 async function post(url: string, body: object) {
   const res = await fetch(url, {method: 'POST', body: JSON.stringify(body)});
   if (!res.ok) throw new Error(await res.text());
