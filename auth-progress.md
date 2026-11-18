@@ -24,7 +24,8 @@ Branch `auth`. Dev server port `3600`.
 - [x] Failure states. Mocked endpoint tests distinguish consent denial, expiry, revocation, refresh failure, and provider outage. Chromium rendered all five messages with the API-key fallback in two runs. Fixed the initial consent-denial message disappearing when opening the panel triggered a second status fetch.
   - Inspected `.screenshots/auth-consent-denied-dark.png` and `.screenshots/auth-provider-unavailable-dark.png`. Two clean root typechecks and `bun run test` passed (30 pass, 0 fail per run). React Doctor scored 100/100 with the temporary preview removed.
   - LIVE PROOF PENDING ENV: Deny live consent, then connect and revoke access in ChatGPT settings. Verify rejected model requests and that the next failed refresh surfaces revocation and leaves the API-key fallback available.
-- [ ] Secret hygiene. Verify that logs, screenshots, test output, and traces contain no tokens, client secrets, or `.env` values.
+- [x] Secret hygiene. Scanned 13 logs including test output, seven screenshots and their OCR text, and checked for local traces and env files. Zero credential matches. The mocked runs produced no trace files and used no live provider values. Next.js on port 3600 returned a safe unavailable status with OAuth unconfigured in two runs.
+  - LIVE PROOF PENDING ENV: Before live consent testing, verify the target deployment's access logs exclude OAuth callback query strings, authorization codes, state, token values, and client secrets. The framework's dev access log records the callback URL during mocked testing.
 
 ## Founder decision
 
@@ -37,6 +38,7 @@ The hosted flow reads `OPENAI_SIWC_CLIENT_ID`, `OPENAI_SIWC_REDIRECT_URI` (exact
 - Complete the hosted OpenAI consent flow under Betterlook's approved client and registered callback, then confirm the workspace displays the signed-in account.
 - Send one workspace chat request using ChatGPT plan access and confirm `runAgent()` gets a reply under that user's allowance. Repeat with a founder-provided OpenAI API key and confirm the reply uses API billing.
 - Sign out after live OAuth consent and confirm provider-side disconnection and that the prior session cannot start another subscription-billed turn.
+- Verify the deployment redacts OAuth callback query strings in access logs before the first live sign-in.
 
 At integration, AI-CORE's chat route should accept only the API-key variant from the request body and resolve OAuth from `getServerCredential(request)`. AI-CORE's `runAgent` streams Responses and already sets `store: false`, overriding the SDK default. Verify the selected model is available to the signed-in account and confirm the hosted partner's inference contract. [Plan inference reference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)
 
