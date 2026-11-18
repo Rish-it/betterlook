@@ -36,6 +36,13 @@ export function tempProject(files: Record<string, string>, scripted: Scripted = 
         return null;
       }
     },
+    readBytes: async p => {
+      try {
+        return readFileSync(p);
+      } catch {
+        return null;
+      }
+    },
     write: async (p, c) => {
       mkdirSync(dirname(p), {recursive: true});
       writeFileSync(p, c);

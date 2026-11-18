@@ -7,6 +7,7 @@ export interface Project {
   root: string;
   list(dir: string): Promise<string[]>;
   read(path: string): Promise<string | null>;
+  readBytes(path: string): Promise<Uint8Array | null>;
   write(path: string, content: string): Promise<void>;
   search(query: string, dir: string): Promise<string>;
   run(cmd: string, args: string[]): Promise<{exitCode: number; output: string}>;
@@ -25,6 +26,7 @@ export function sandboxProject(sandbox: Sandbox, root: string): Project {
     run,
     list: async dir => (await run('find', [dir, '-type', 'f', ...SKIP])).output.split('\n').filter(Boolean).map(p => posix.relative(root, p)),
     read: async path => (await sandbox.readFileToBuffer({path}))?.toString('utf8') ?? null,
+    readBytes: path => sandbox.readFileToBuffer({path}),
     write: (path, content) => sandbox.writeFiles([{path, content}]),
     search: async (query, dir) =>
       (await run('grep', ['-rnI', '--exclude-dir=node_modules', '--exclude-dir=.git', '--exclude-dir=dist', '-e', query, dir])).output.replaceAll(`${root}/`, ''),

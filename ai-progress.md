@@ -157,7 +157,31 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
     3. A broken edit triggers exactly one repair.
     4. Restore through `restoreCheckpoint()` reverts the preview, and `[event] restore` appears in the log and in the Langfuse trace.
   - Fragile: the checker install adds Chromium and its system libraries to sandbox creation (slow, and needs `sudo` in the sandbox image). Whether `/tmp/betterlook` survives a persistent-sandbox stop and resume is unverified; if it does not, the runtime check reports `skipped`, not `failed`.
-- [ ] Headless runner: agent:run on a two-task sample file from the founder produces complete run folders, 2 runs each, through the same runAgent().
+- [x] Headless runner: agent:run on a two-task sample file from the founder produces complete run folders, 2 runs each, through the same runAgent().
+
+  Built to the orchestrator's "interfaces first" rule; no task file is committed and no task prompts were written.
+  - **CLI:** `bun run agent:run --tasks <file.json> --runs <k> [--concurrency n] [--model id] [--out dir]` works from the repo root or `apps/web`, with paths relative to where you run it. Bun bundles `apps/web/scripts/agent-run.ts` and Node runs it (`node --env-file-if-exists=.env`), because `@vercel/sandbox` cannot load under Bun.
+  - **Task file:** JSON `[{"id", "prompt", ...}]`, checked by `parseTasks`: non-empty array, filesystem-safe unique ids, a prompt for each. Extra fields pass through untouched into `task.json`.
+  - **Core (`lib/agent/runner.ts` `runTasks`):** runs every task k times through a worker pool capped at `RUNNER_CONFIG.concurrency` (2). Each run gets a fresh sandbox (`createSandbox` → `openProject`), a before screenshot, the same `runAgent()` the chat uses, then an after screenshot.
+  - **Run folder:** `<out>/<task id>/run-<n>/` holds `task.json`, `turn.json` (the full TurnRecord), `diff.patch`, `verify.json` (verify, repairAttempted, repairVerify), `before.png` and `after.png`. Every text file goes through `maskSecrets` before it is written. The default out dir is `.scratch/agent-runs/<timestamp>`, which is git-ignored.
+  - **Screenshots:** the in-sandbox checker with a screenshot path, read back as bytes (`Project.readBytes`). It retries 3 times, 3 s apart, while the dev server starts.
+  - **Rate limits:** a run whose turn ends with the 429 message is retried on a fresh sandbox after `backoffMs × 2^(attempt-1)` (5 s, then 10 s), up to `maxAttempts` (3). The AI SDK's own per-call retries still apply first.
+  - **Eval key:** `evalCredential(env)` reads only `OPENAI_EVAL_API_KEY` (never `OPENAI_API_KEY` or a user credential) and refuses to start without it. The runner is a separate process from the app. Because OpenAI rate limits are per project, not per key, the eval key must belong to its own OpenAI project; `.env.example` says so.
+  - **Traces:** each run produces the normal turn trace; `flushTraces()` runs before exit.
+  Evidence:
+  - `bun run typecheck` + `bun run test` run 1: pass, run 2: pass (57 tests). `runner.test.ts` uses a task list built inside the test, mock models and temp git projects:
+    - **Parsing:** extra fields kept; empty array, non-array, `../x` id, missing prompt and duplicate id all rejected.
+    - **Eval key:** `evalCredential` takes only `OPENAI_EVAL_API_KEY` and throws when only `OPENAI_API_KEY` is set.
+    - **2 tasks × 2 runs, cap 2:** 4 results all `passed`, 4 model instances, at most 2 runs in flight. Each folder holds exactly `after.png, before.png, diff.patch, task.json, turn.json, verify.json`. `turn.json` carries `SYSTEM_PROMPT_HASH`, the task prompt and a 40-hex checkpoint; `diff.patch` holds the edit; `verify.json` shows `ok: true`; `task.json` equals the input including its extra field.
+    - **Cap of 1:** 3 runs complete in order with never more than one in flight.
+    - **429 on the first attempt:** one 5 s backoff, a second sandbox, then `passed` with `attempts: 2`; logs `only run 1: rate limited, retrying in 5s` and `only run 1: passed`.
+    - **Screenshot:** the checker is called with `/tmp/betterlook/preview.png`, retried twice with 3 s waits, and the bytes come back.
+  - **Real CLI path (Bun bundle, then Node):**
+    - no env: `Error: Set the Vercel sandbox credentials in apps/web/.env.`
+    - fake Vercel vars only: `Error: Set OPENAI_EVAL_API_KEY in apps/web/.env. The runner never uses a user key.`
+    - fake Vercel vars plus a fake eval key: `@vercel/sandbox` loads under Node and the real API answers `Status code 403 is not ok: Not authorized`.
+    - The fake values appear 0 times in the output. A relative `--tasks` path resolves from the repo root.
+  - LIVE PROOF PENDING ENV: founder task file + OPENAI_EVAL_API_KEY + Vercel. Run `bun run agent:run --tasks <founder file> --runs 2` and confirm that each task has `run-1` and `run-2` folders, each holding `task.json`, `turn.json`, `diff.patch`, `verify.json`, `before.png` and `after.png`. The PNGs should show the preview before and after the edit, and each run's trace should appear in Langfuse.
 - [ ] End to end: "make the hero heading blue" from the landing screen edits the code, verify passes, the preview turns blue, and the trace has every tool call, the diff and the checkpoint id.
 - [ ] Failure states: rate limit, provider error, sandbox down, denied tool, failed verify and step limit each show a readable message, and the chat keeps working.
 
@@ -200,11 +224,13 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
      - Approve and deny need no client call: the server logs them when the approval response arrives with the next request (`chat.addToolApprovalResponse`).
   - Server exports: `runAgent(...)` now returns `{stream, turn}` (`agentUIStream` removed); `SYSTEM_PROMPT_HASH` (prompt plus repair prompt); `repairMessage`; `checkpoint.ts` (`commitTurn`, `restoreCheckpoint`); `verify.ts` (`verifyProject`, `runtimeErrors`); `events.ts` (`logEvent`, `parseKeepEvent`).
 
+- Runner item, new exports: `lib/agent/runner.ts` (`parseTasks`, `evalCredential`, `runTasks`, `previewScreenshot`, `Task`, `RunSummary`), `RUNNER_CONFIG` in `config.ts`, `Project.readBytes`, and `RATE_LIMITED` in `errors.ts` (a 429 now gets its own message: "The model provider is rate limiting requests. Wait a minute and try again.").
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:
 
-- **Headless runner (blocked, needs the founder):** please give the two-task sample file for `agent:run`, and confirm its format. My default is JSON: `[{"id": "hero-blue", "prompt": "..."}]`, with any extra fields the founder's judges need passed through untouched into each run folder. I won't write task content. The live runner will also need `OPENAI_EVAL_API_KEY` (a key separate from users', so it doesn't share their rate-limit budget) plus the Vercel credentials in `apps/web/.env`.
+- **Headless runner (built per the orchestrator; still needs the founder for the live run):** please give the two-task sample file for `agent:run`, and confirm its format. My default is JSON: `[{"id": "hero-blue", "prompt": "..."}]`, with any extra fields the founder's judges need passed through untouched into each run folder. I won't write task content. The live runner will also need `OPENAI_EVAL_API_KEY` (a key separate from users', so it doesn't share their rate-limit budget) plus the Vercel credentials in `apps/web/.env`.
 - **Runner runtime note:** `@vercel/sandbox` does not load under Bun, so `bun run agent:run` will run the script under Node (`bun run` → `node --experimental-strip-types`), or through a small Node bundle if Node's type stripping cannot resolve the extensionless imports. I'll pick at build time.
 
 - Resolved: the picker default moves to AI-UI importing `lib/agent/models.ts` (see types.ts changes). Until AI-UI wires it, `Workspace.tsx` still seeds from `composer/models.ts`, so a non-OpenAI pick shows "<model> is not connected yet."
@@ -221,6 +247,7 @@ Original questions:
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
 
+- Headless runner: founder task file + OPENAI_EVAL_API_KEY + Vercel. `agent:run --runs 2` writes complete folders with real before and after screenshots, and each run has its trace.
 - Checkpoint and verify: in a real sandbox, the checker installs, the runtime check runs in the sandbox, a turn streams checkpoint, diff and verify, a broken edit gets one repair, and restore reverts the preview and logs the event.
 - Tools and policy: in a real sandbox, read and edit run; `/etc/passwd` is denied and shown; a `package.json` edit pauses, Approve writes and Deny leaves it.
 - Sandbox: real Vercel sandbox from the landing prompt, the preview shows the starter, a reload reconnects to the same sandbox, and a stopped sandbox resumes with the dev server restarted.
