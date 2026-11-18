@@ -203,11 +203,31 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
     - `bun run typecheck`: exit 0 on two clean runs
     - `bun test`: 55 pass on both runs
     - `react-doctor`: two index-key warnings (judged false positives), `Workspace.tsx:167` (AI-CORE's sandbox effect, kept as asked), and `lib/agent/verify.ts:29` (AI-CORE's file)
+  - Fix (orchestrator review): the landing prompt's first send went out before the sandbox request resolved, so it carried `sandboxId: null` and the agent had no project.
+    - Root cause: the first-send effect and the sandbox effect ran independently, and `getSandboxId()` read localStorage before `requestSandbox()` had stored the id.
+    - The first send now chains on the shared `sandboxRequest`. While it waits, `isConnecting` shows `Thinking` and locks the composer. Stop cancels the pending first send.
+    - A failed or unconfigured sandbox still sends, so AI-CORE's readable message reaches the chat.
+  - Playwright check (`.screenshots/first-send-check.mjs`, sandbox delayed 1.5s, exits 1 on failure):
+    - success case: exactly one `/api/chat` request, sent after the sandbox responded, carrying `sandboxId: 'sbx_first'`; Thinking was visible and the input locked while waiting
+    - 503 case: still one request, `sandboxId: null`, toolbar shows "The preview sandbox is not configured yet."
+    - against the pre-fix `Workspace.tsx`, the same check fails: the chat request and reply complete before the sandbox has responded
+    - `.screenshots/stop-connect.mjs`: Stop during connecting results in 0 chat requests and an editable input
+    - screenshot: `.screenshots/ai-10-first-send-connecting.png`
+  - `react-doctor` now also flags `Workspace.tsx:160`, the one-time start effect waiting on the sandbox request. This is intended: the same page-start pattern as the existing sandbox effect at :185.
+  - Keep (founder decision: an explicit control): `Checkpoint` has a ghost Keep `Button` beside Restore.
+    - Keep emits `TurnEvent` `{type: 'keep', turnId, at}`, and `Workspace` calls `keepTurn({turnId, traceId})` with `traceId` from the assistant message metadata.
+    - Once kept, the marker shows a quiet "Kept" (`role="status"`) and hides Keep; Restore stays. There is no dialog.
+    - If `keepTurn` rejects, Keep comes back so it can be retried.
+    - Kept state is local to the page: after a reload Keep shows again.
+  - Keep checks:
+    - dev page: Keep is a `<button>` with a visible focus ring; Enter marks it kept and emits the keep event; the failing instance brings Keep back; both markers keep Restore
+    - dev page screenshots: `.screenshots/ai-08-keep-{light,dark}-before.png` and `-after.png`
+    - live (`.screenshots/keep-live.mjs`): Keep POSTed `/api/events` with `{type: 'keep', turnId: 'turn_1', traceId: 'trace_1'}`, then "Kept" showed, Keep was hidden and Restore remained. With `/api/events` returning 500, Keep came back and "Kept" was gone. No console errors.
+    - live screenshots: `.screenshots/ai-10-keep-{light,dark}-keep.png`
+  - After the change: first-send checks re-run and pass (success, 503, stop while connecting); `bun run typecheck` exit 0 and `bun test` 55 pass, both on two clean runs.
   - Still not live:
-    - Keep: `keepTurn` exists but nothing calls it. When a turn counts as "kept" (an explicit control, or implied by the next prompt) is a product and eval decision for the founder.
     - Real chat turns are proven against a Playwright-stubbed stream, not a live provider. I have no key and don't type credentials.
     - Attachments: `Composer` passes files to `onSubmit`, but `Workspace.send` drops them; the agent takes no files.
-    - The first request after a new prompt goes out with `sandboxId: null`, because the sandbox request is still pending. That is pre-existing timing in the sandbox flow.
     - `AuthControls` hard-codes `#000`/`#202020` on its ChatGPT button (AUTH's file); flagged for AUTH, not changed.
 
 ## Questions for the founder

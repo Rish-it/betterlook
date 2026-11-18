@@ -156,8 +156,11 @@ function CheckpointStates() {
   const [events, setEvents] = useState<TurnEvent[]>([]);
   return (
     <>
-      <State label="marker between turns; Restore opens a confirm step">
+      <State label="marker between turns; Keep marks the turn kept, Restore opens a confirm step">
         <Checkpoint checkpoint={f.checkpoint} onEvent={e => setEvents(list => [...list, e])} />
+      </State>
+      <State label="keep fails: Keep comes back for a retry">
+        <Checkpoint checkpoint={{...f.checkpoint, id: 'cp_fail'}} onEvent={() => Promise.reject(new Error('offline'))} />
       </State>
       <State label="events emitted">
         <Code language="json" code={JSON.stringify(events, null, 2)} />

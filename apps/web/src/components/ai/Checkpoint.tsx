@@ -14,11 +14,17 @@ const styles = stylex.create({
 
 type CheckpointProps = {
   checkpoint: CheckpointRecord;
-  onEvent(event: TurnEvent): void;
+  onEvent(event: TurnEvent): void | Promise<void>;
 };
 
 export function Checkpoint({checkpoint, onEvent}: CheckpointProps) {
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isKept, setIsKept] = useState(false);
+  const keep = () => {
+    setIsKept(true);
+    // A failed keep brings the button back so it can be retried.
+    Promise.resolve(onEvent({type: 'keep', turnId: checkpoint.turnId, at: new Date().toISOString()})).catch(() => setIsKept(false));
+  };
   const restore = () => {
     setIsConfirming(false);
     onEvent({type: 'restore', turnId: checkpoint.turnId, checkpointId: checkpoint.id, at: new Date().toISOString()});
@@ -31,6 +37,13 @@ export function Checkpoint({checkpoint, onEvent}: CheckpointProps) {
           Checkpoint
         </Text>
         <Timestamp value={checkpoint.createdAt} type="supporting" />
+        {isKept ? (
+          <Text type="supporting" color="secondary" role="status">
+            Kept
+          </Text>
+        ) : (
+          <Button label="Keep" variant="ghost" size="sm" onClick={keep} />
+        )}
         <Button label="Restore" variant="ghost" size="sm" onClick={() => setIsConfirming(true)} />
       </HStack>
       <AlertDialog

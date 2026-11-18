@@ -18,7 +18,7 @@ import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/token
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/lib/agent/models';
-import {createAgentChat, restoreCheckpoint} from '@/lib/agent/client';
+import {createAgentChat, keepTurn, restoreCheckpoint} from '@/lib/agent/client';
 import type {TurnEvent} from '@/lib/agent/types';
 import {getCredential} from '@/lib/auth/client';
 import {AuthControls} from '@/components/auth/AuthControls';
@@ -136,7 +136,9 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const [chat] = useState(() => createAgentChat({getCredential, getSandboxId: () => readStored(SANDBOX_KEY)}));
   const {messages, setMessages, sendMessage, status, stop, error} = useChat({chat});
   const [preview, setPreview] = useState<Preview>({url: PREVIEW_URL});
-  const isBusy = status === 'submitted' || status === 'streaming';
+  // The first prompt waits for the sandbox, so its request carries the sandbox id.
+  const [isConnecting, setIsConnecting] = useState(false);
+  const isBusy = isConnecting || status === 'submitted' || status === 'streaming';
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
@@ -149,6 +151,12 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   };
 
   const started = useRef(false);
+  const firstSendCancelled = useRef(false);
+  const stopTurn = () => {
+    firstSendCancelled.current = true;
+    setIsConnecting(false);
+    void stop();
+  };
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -160,8 +168,18 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
       sandboxRequest = null;
       window.history.replaceState(null, '', `/workspace?${new URLSearchParams({model: initialModelValue})}`);
     }
-    if (saved) setMessages(JSON.parse(saved));
-    else sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+    if (saved) {
+      setMessages(JSON.parse(saved));
+      return;
+    }
+    setIsConnecting(true);
+    sandboxRequest ??= requestSandbox();
+    // A failed sandbox still sends, so the chat shows the server's readable message.
+    sandboxRequest.then(() => {
+      if (firstSendCancelled.current) return;
+      setIsConnecting(false);
+      sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+    });
   }, [prompt, initialModelValue, sendMessage, setMessages]);
 
   useEffect(() => {
@@ -188,9 +206,13 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
 
   const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
   const onTurnEvent = async (event: TurnEvent) => {
+    const traceId = messages.find(m => m.metadata?.turnId === event.turnId)?.metadata?.traceId;
+    if (event.type === 'keep') {
+      await keepTurn({turnId: event.turnId, traceId});
+      return;
+    }
     const sandboxId = readStored(SANDBOX_KEY);
     if (event.type !== 'restore' || !sandboxId) return;
-    const traceId = messages.find(m => m.metadata?.turnId === event.turnId)?.metadata?.traceId;
     try {
       await restoreCheckpoint({sandboxId, checkpointId: event.checkpointId, turnId: event.turnId, traceId});
       setRestoreNotice('Restored. The preview shows the app as it was at that checkpoint.');
@@ -240,10 +262,10 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                   model={model}
                   onModelChange={setModel}
                   isStreaming={isBusy}
-                  onStop={stop}
+                  onStop={stopTurn}
                 />
               }>
-              {status === 'submitted' && (
+              {(isConnecting || status === 'submitted') && (
                 <ChatMessage sender="assistant">
                   <Thinking />
                 </ChatMessage>
