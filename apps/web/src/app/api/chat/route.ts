@@ -1,6 +1,6 @@
 import {convertToModelMessages, createUIMessageStreamResponse} from 'ai';
 import {languageModel, parseCredential, providerOf} from '@/lib/agent/model';
-import {agentUIStream} from '@/lib/agent/run';
+import {runAgent} from '@/lib/agent/run';
 import type {AgentMessage} from '@/lib/agent/types';
 import {getServerCredential} from '@/lib/auth/server';
 import type {Project} from '@/lib/sandbox/project';
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const stream = agentUIStream({
+  const {stream} = runAgent({
     model: languageModel(body.model, credential),
     messages: await convertToModelMessages(body.messages),
     project,

@@ -12,8 +12,12 @@ function fakeApi(failOn?: string) {
     cwd: '/vercel/sandbox',
     domain: (port: number) => `https://sbx-test-${port}.example`,
     writeFiles: async (files: {path: string}[]) => void calls.push(`write ${files.map(f => f.path).sort().join(',')}`),
-    runCommand: async (cmdOrParams: string | {cmd: string; args: string[]; detached?: boolean}, args: string[] = []) => {
-      const line = typeof cmdOrParams === 'string' ? `${cmdOrParams} ${args.join(' ')}` : `${cmdOrParams.cmd} ${cmdOrParams.args.join(' ')}${cmdOrParams.detached ? ' &' : ''}`;
+    mkDir: async (path: string) => void calls.push(`mkdir ${path}`),
+    runCommand: async (cmdOrParams: string | {cmd: string; args: string[]; detached?: boolean; sudo?: boolean}, args: string[] = []) => {
+      const line =
+        typeof cmdOrParams === 'string'
+          ? `${cmdOrParams} ${args.join(' ')}`
+          : `${cmdOrParams.sudo ? 'sudo ' : ''}${cmdOrParams.cmd} ${cmdOrParams.args.join(' ')}${cmdOrParams.detached ? ' &' : ''}`;
       calls.push(line);
       return {exitCode: failOn && line.startsWith(failOn) ? 1 : 0};
     },
@@ -41,6 +45,10 @@ test('a fresh sandbox gets the starter, installs, commits it to git and starts t
     'git config user.email agent@betterlook.invalid',
     'git add -A',
     'git commit -q -m starter',
+    'mkdir /tmp/betterlook',
+    'write /tmp/betterlook/check.mjs',
+    'npm install --prefix /tmp/betterlook --no-audit --no-fund playwright@1.58.0',
+    'sudo npx --prefix /tmp/betterlook playwright install --with-deps chromium',
     'npm run dev &',
   ]);
 });

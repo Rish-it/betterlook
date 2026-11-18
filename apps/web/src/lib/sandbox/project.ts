@@ -1,5 +1,6 @@
 import {posix} from 'node:path';
 import type {Sandbox} from '@vercel/sandbox';
+import {CHECKER_ENV} from './runtime-check';
 
 export interface Project {
   id: string;
@@ -15,7 +16,7 @@ const SKIP = ['-not', '-path', '*/node_modules/*', '-not', '-path', '*/.git/*', 
 
 export function sandboxProject(sandbox: Sandbox, root: string): Project {
   const run = async (cmd: string, args: string[]) => {
-    const result = await sandbox.runCommand({cmd, args, cwd: root});
+    const result = await sandbox.runCommand({cmd, args, cwd: root, env: CHECKER_ENV});
     return {exitCode: result.exitCode, output: await result.output('both')};
   };
   return {
