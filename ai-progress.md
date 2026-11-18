@@ -93,7 +93,33 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
   - Secret-pattern grep over `.screenshots/*.log` and `apps/web/src`: the only hit is `trace.test.ts`, whose `sk-proj-userkeyABCDEF123456` is the made-up key the masking test proves gets redacted. No `.env` exists.
   - LIVE PROOF PENDING ENV: with Vercel credentials, open `/` and send a prompt. `/api/sandbox` creates a sandbox, the preview iframe shows the starter from `*.vercel.run`, and `git log` in the sandbox shows `starter`. Reload `/workspace`: the same `sandboxId` is sent and the same preview returns. Stop the sandbox, then reload: it resumes and the dev server restarts.
   - Fragile, noted for the runner item: `@vercel/sandbox` cannot load under Bun (Bun's built-in `undici` lacks `Dispatcher1Wrapper`); it loads under Node, so Next is fine. `sandbox.ts` imports it lazily so Bun tests inject a fake. `agent:run` will need to run under Node.
-- [ ] Tools and policy: the allowlisted tools work; a call outside the project folder is denied, logged and returned to the model as a tool error; a package.json edit pauses for approval.
+- [x] Tools and policy: the allowlisted tools work; a call outside the project folder is denied, logged and returned to the model as a tool error; a package.json edit pauses for approval.
+
+  Built:
+  - **`lib/agent/config.ts`, the one controls file:** `maxSteps`, `maxOutputTokens`, `tools` allowlist (`list_files`, `read_file`, `search`, `edit_file`, `write_file`, `typecheck`; no shell, web or installs), `deniedPaths` (`.git`, `node_modules`), `approvalFiles` (`package.json`, `package-lock.json`, `*.lock`, `pnpm-lock.yaml`, `tsconfig*.json`, `*.config.*`, `.env*`, matched on file name at any depth), `maxToolOutputChars`, `promptCachePerProject`.
+  - **`lib/agent/policy.ts`, the single check:** `checkPolicy(tool, input, root)` returns allow, approve or deny. It denies non-allowlisted tools, any path that resolves outside the project root, and `.git`/`node_modules`. Writes and edits to protected files return approve.
+  - **Where it runs:** `runAgent` passes it to the AI SDK as one generic `toolApproval` function, so it runs before every tool call. Deny → `{type: 'denied', reason}`: the model gets a denied tool output carrying the reason, the server logs `[policy] denied: <tool> <reason>` (no args), the turn records a `DeniedCall` with `decision: 'denied'`, and the stream writes a `data-denied` part. Approve → `'user-approval'`: the turn pauses on the SDK's `tool-approval-request`, the stream writes `data-approval` (path plus proposed diff), and the status becomes `awaiting-approval`. The next request carrying the approval response runs the tool (`decision: 'approved'`); a denial leaves the file alone and the model gets the user's reason.
+  - **`lib/agent/tools.ts`:** JSON-schema tools via `jsonSchema` from `ai` (no zod). `edit_file` replaces one exact, unique match or explains 0 or N matches. Output is clipped. Each call is recorded with args, result or error, decision, start time and duration. `TOOL_DEFINITIONS` (descriptions and schemas) feeds the hash: `TOOL_CONFIG_HASH = hashOf({config: AGENT_CONFIG, tools: TOOL_DEFINITIONS})`, so editing either changes it.
+  - **`lib/sandbox/project.ts`:** `Project` interface plus `sandboxProject(sandbox, root)`, which runs `find` and `grep` with argument arrays, not a shell. `openProject(sandboxId)` roots the project at the sandbox's own `cwd`.
+  - **Prompt caching:** OpenAI caches automatically; `promptCacheKey` is set to the sandbox id so turns on one project share a cache.
+  - **`/api/chat`:** opens the project from `body.sandboxId` when the sandbox is configured (503 "The preview sandbox is not reachable. Reload to try again." if it cannot), and serves `agentUIStream()`, which merges the model stream with the data parts.
+  - **`lib/agent/client.ts`:** `createAgentChat({getCredential, getSandboxId, messages?})`, a `Chat<AgentMessage>` whose body sends `credential` and `sandboxId` and whose `sendAutomaticallyWhen` continues once approvals are answered. AI-UI approves or denies with `chat.addToolApprovalResponse({id, approved, reason?})`.
+  Evidence:
+  - `bun run typecheck` + `bun run test` run 1: pass, run 2: pass (22 tests). `tools.test.ts`, with a mock model against a real temp folder:
+    - **policy table:** inside allowed; `../secrets`, `/etc/passwd`, `src/../../x` and a sibling-prefix path denied; `.git` and `node_modules` denied; 7 protected names → approve for both write and edit, at any depth; a read of `package.json` is allowed; an unknown tool is denied as `not-allowlisted`.
+    - **`edit_file`:** single, zero and multiple matches, plus a `$&` replacement kept literal.
+    - **One turn calling four tools:** `list_files` returned `package.json\nsrc/App.tsx`, `search` found `src/App.tsx:1:`, `edit_file` changed the file on disk, and `read_file ../../etc/passwd` was denied. Records are `[c4 denied, c1/c2/c3 allowed]` with timing; exactly one `data-denied` chunk; warn log `['[policy] denied:', 'read_file', 'outside-project']`. The model's next prompt holds "../../etc/passwd is outside the project folder." and "Edited src/App.tsx."; provider options `{store: false, promptCacheKey: 'sbx-local'}`.
+    - **`write_file package.json`:** status `awaiting-approval`, no tool record, file unchanged, `data-approval` with the diff. After the approval response is appended: file written, record `[p1 approved]`, status `passed`.
+    - **User denial:** the file is unchanged and the model's prompt holds "User denied the edit."
+    - **The served stream (`agentUIStream`):** carries `data-denied`, `data-approval`, `tool-output-denied` and `tool-approval-request`.
+  - `sandbox.test.ts`: `openProject` resumes the sandbox, restarts dev, and roots at the sandbox `cwd`.
+  - Live route after the refactor (BYOK browser check): `[agent] model call failed: 401`, `POST /api/chat 200`, then `401`.
+  - No screenshot of tool activity or approval buttons: `Workspace.tsx` belongs to AI-UI now (orchestrator), and AI-UI renders the `tool-*`, `data-denied` and `data-approval` parts. The data contract is proven at the stream level above.
+  - No `.env`; the secret-pattern grep only hits the masking fixture in `trace.test.ts`.
+  - LIVE PROOF PENDING ENV: with OpenAI and Vercel credentials and AI-UI's chat wired through `createAgentChat`:
+    1. Ask "read src/App.tsx and make the heading blue": `read_file` and `edit_file` run in the sandbox and the preview updates.
+    2. Ask "read /etc/passwd": the denial appears as a `data-denied` part, the model explains it, and the server log shows `[policy] denied: read_file outside-project`.
+    3. Ask "add lodash to package.json": the turn pauses with a `data-approval` diff; Approve writes it, Deny leaves it.
 - [ ] Checkpoint and verify: commit per turn, verify after each turn, one repair attempt, failed-turn state, restore works, events logged.
 - [ ] Headless runner: agent:run on a two-task sample file from the founder produces complete run folders, 2 runs each, through the same runAgent().
 - [ ] End to end: "make the hero heading blue" from the landing screen edits the code, verify passes, the preview turns blue, and the trace has every tool call, the diff and the checkpoint id.
@@ -111,6 +137,19 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 - Tracing item: `TurnRecord.provider` is now `string`, the AI SDK provider id such as `openai.responses`, instead of `ProviderId`. `runAgent()` returns `{result, turn}`, where `turn` is a `Promise<TurnRecord>`.
 
 - `7449b371` orchestrator request (for AI-UI): `VerifyCheck.ok: boolean` is replaced by `status: VerifyCheckStatus` (`'passed' | 'failed' | 'skipped'`), so a runtime check skipped because the build failed no longer reads as a failure. `VerifyResult.ok` stays the overall pass.
+
+- Data contract (orchestrator): `types.ts` now imports `type UIMessage` from `ai` and exports:
+  - `AgentDataParts`, the custom data parts the chat stream writes: `denied: DeniedCall`, `approval: PendingApproval` (`toolCallId`, `tool`, `path`, `diff`, the proposed unified diff), `verify: VerifyResult`, `checkpoint: Checkpoint`, `diff: TurnDiff` (`diff`, `filesTouched`). They reach the UI as `data-denied`, `data-approval`, `data-verify`, `data-checkpoint` and `data-diff` parts.
+  - `AgentMetadata` (`model?`, `turnId?`, `traceId?`).
+  - `AgentMessage = UIMessage<AgentMetadata, AgentDataParts>`.
+  `DeniedCall` gains `toolCallId`. A policy-denied call still goes back to the model as a tool error; the stream also writes a `data-denied` part.
+- Ownership (orchestrator): `workspace/Workspace.tsx` belongs to AI-UI from now on. AI-CORE's last change to it is `12b85c12`; nothing is uncommitted.
+
+- Tools item, new server exports from `lib/agent/` (no `types.ts` type changes beyond `7251b7ef`):
+  - `run.ts`: `runAgent({model, messages, project?, abortSignal?, onData?})`, `agentUIStream(...)` (the stream `/api/chat` serves, with `data-*` parts), `AgentChunk`, `TOOL_CONFIG_HASH`.
+  - `policy.ts`: `checkPolicy(tool, input, root)`.
+  - `tools.ts`: `TOOL_DEFINITIONS`, `createTools`, `applyEdit`, `proposedDiff`.
+- Tools item, for AI-UI: `lib/agent/client.ts` exports `createAgentChat({getCredential, getSandboxId, messages?})`, which returns `Chat<AgentMessage>`. Pass it as `useChat({chat})`, send with `sendMessage({text, metadata: {model}}, {body: {model}})`, and answer approvals with `chat.addToolApprovalResponse({id: part.approval.id, approved, reason?})`; the chat continues by itself. `/api/chat` now reads `sandboxId` from the body, so the workspace must send it (`createAgentChat` does). Until then the agent has no tools in the live UI.
 
 ## Questions for the founder
 
@@ -130,6 +169,7 @@ Original questions:
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
 
+- Tools and policy: in a real sandbox, read and edit run; `/etc/passwd` is denied and shown; a `package.json` edit pauses, Approve writes and Deny leaves it.
 - Sandbox: real Vercel sandbox from the landing prompt, the preview shows the starter, a reload reconnects to the same sandbox, and a stopped sandbox resumes with the dev server restarted.
 - Tracing: a Langfuse trace per turn with nested model spans, hashes in metadata, record as output, cost computed; hash changes after a prompt edit; exported trace JSON has no `.env` value.
 - BYOK: valid key streams; missing key and revoked key show the two messages (needs AUTH's `getCredential()` and a real key).

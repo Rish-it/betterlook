@@ -1,4 +1,5 @@
 import type {Sandbox} from '@vercel/sandbox';
+import {sandboxProject, type Project} from './project';
 import {PREVIEW_PORT, STARTER_FILES} from './starter';
 
 type SandboxApi = Pick<typeof Sandbox, 'create' | 'get'>;
@@ -41,4 +42,9 @@ export async function createSandbox(api?: SandboxApi): Promise<SandboxInfo> {
 
 export async function connectSandbox(sandboxId: string, api?: SandboxApi): Promise<SandboxInfo> {
   return info(await (api ?? (await vercelSandbox())).get({name: sandboxId, resume: true, onResume: startPreview, ...credentials()}));
+}
+
+export async function openProject(sandboxId: string, api?: SandboxApi): Promise<Project> {
+  const sandbox = await (api ?? (await vercelSandbox())).get({name: sandboxId, resume: true, onResume: startPreview, ...credentials()});
+  return sandboxProject(sandbox, sandbox.cwd);
 }

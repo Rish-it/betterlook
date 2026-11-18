@@ -1,3 +1,5 @@
+import type {UIMessage} from 'ai';
+
 export type ProviderId = 'openai' | 'anthropic';
 
 export type ProviderCredential =
@@ -7,6 +9,7 @@ export type ProviderCredential =
 export type ToolName = 'list_files' | 'read_file' | 'search' | 'edit_file' | 'write_file' | 'typecheck';
 
 export interface DeniedCall {
+  toolCallId: string;
   tool: string;
   args: unknown;
   reason: 'outside-project' | 'not-allowlisted' | 'user-denied';
@@ -83,3 +86,31 @@ export type TurnEvent =
   | {type: 'keep'; turnId: string; at: string}
   | {type: 'approve'; turnId: string; toolCallId: string; at: string}
   | {type: 'deny'; turnId: string; toolCallId: string; at: string};
+
+export interface PendingApproval {
+  toolCallId: string;
+  tool: ToolName;
+  path: string;
+  diff: string;
+}
+
+export interface TurnDiff {
+  diff: string;
+  filesTouched: string[];
+}
+
+export type AgentDataParts = {
+  denied: DeniedCall;
+  approval: PendingApproval;
+  verify: VerifyResult;
+  checkpoint: Checkpoint;
+  diff: TurnDiff;
+};
+
+export interface AgentMetadata {
+  model?: string;
+  turnId?: string;
+  traceId?: string;
+}
+
+export type AgentMessage = UIMessage<AgentMetadata, AgentDataParts>;
