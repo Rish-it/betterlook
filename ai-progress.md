@@ -151,6 +151,8 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
   - `tools.ts`: `TOOL_DEFINITIONS`, `createTools`, `applyEdit`, `proposedDiff`.
 - Tools item, for AI-UI: `lib/agent/client.ts` exports `createAgentChat({getCredential, getSandboxId, messages?})`, which returns `Chat<AgentMessage>`. Pass it as `useChat({chat})`, send with `sendMessage({text, metadata: {model}}, {body: {model}})`, and answer approvals with `chat.addToolApprovalResponse({id: part.approval.id, approved, reason?})`; the chat continues by itself. `/api/chat` now reads `sandboxId` from the body, so the workspace must send it (`createAgentChat` does). Until then the agent has no tools in the live UI.
 
+- Checkpoint item, types: `Checkpoint.parentId` (the commit before the turn, so "undo this turn" is a restore to `parentId`), and every `TurnEvent` gets an optional `traceId`, so events land in the turn's Langfuse trace.
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:

@@ -44,6 +44,7 @@ export interface VerifyResult {
 
 export interface Checkpoint {
   id: string;
+  parentId: string;
   sandboxId: string;
   turnId: string;
   createdAt: string;
@@ -82,10 +83,10 @@ export interface TurnRecord {
 }
 
 export type TurnEvent =
-  | {type: 'restore'; turnId: string; checkpointId: string; at: string}
-  | {type: 'keep'; turnId: string; at: string}
-  | {type: 'approve'; turnId: string; toolCallId: string; at: string}
-  | {type: 'deny'; turnId: string; toolCallId: string; at: string};
+  | {type: 'restore'; turnId: string; traceId?: string; checkpointId: string; at: string}
+  | {type: 'keep'; turnId: string; traceId?: string; at: string}
+  | {type: 'approve'; turnId: string; traceId?: string; toolCallId: string; at: string}
+  | {type: 'deny'; turnId: string; traceId?: string; toolCallId: string; at: string};
 
 export interface PendingApproval {
   toolCallId: string;
