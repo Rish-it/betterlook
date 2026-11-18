@@ -2,9 +2,9 @@
 
 Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/src/composer/**` and `apps/web/src/app/dev/ai/page.tsx`. Dev server port 3500.
 
-- [ ] Map: use the agent-reach skill to read the relevant AI Elements and Beautiful UI pages. For each component, write one line: the reference you'll follow, the Astryx components it's built from, and its props (using our shared types). Flag Astryx gaps. Stop and wait for my OK.
+- [x] Map: use the agent-reach skill to read the relevant AI Elements and Beautiful UI pages. For each component, write one line: the reference you'll follow, the Astryx components it's built from, and its props (using our shared types). Flag Astryx gaps. Stop and wait for my OK.
 
-  Map drafted, waiting for the founder's OK. Read through agent-reach (web channel, Jina Reader) on 2026-11-18: AI Elements `conversation`, `message`, `prompt-input`, `tool`, `confirmation`, `reasoning`, `checkpoint`, `shimmer`, `web-preview`, plus the Beautiful UI index (Thinking, Approval Card, Tool Chips, Diff Table). I port no code from either, so no licence notices are needed; every component is our own, built on Astryx 0.7.16.
+  Founder OK received through the orchestrator. Read through agent-reach (web channel, Jina Reader) on 2026-11-18: AI Elements `conversation`, `message`, `prompt-input`, `tool`, `confirmation`, `reasoning`, `checkpoint`, `shimmer`, `web-preview`, plus the Beautiful UI index (Thinking, Approval Card, Tool Chips, Diff Table). I port no code from either, so no licence notices are needed; every component is our own, built on Astryx 0.7.16.
 
   Shared types come from `lib/agent/types.ts` v1 (merged from `betterlook` at e7c6d5ec). Imported, never declared. `UIMessage`/`ToolUIPart` come from `ai`, which AI-CORE is adding.
 
@@ -33,7 +33,19 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   Notes on types.ts v1:
   - `ToolCallRecord.decision` has no pending value. The approval card shows the call while the turn is `awaiting-approval`; tell me if a different field will mark the pending call.
   - `TurnRecord.diff` is one unified diff string, so the diff view parses per-file line counts from it.
-- [ ] Fixtures and a dev-only page that renders every component in every state.
+- [x] Fixtures and a dev-only page that renders every component in every state.
+
+  - `apps/web/src/components/ai/fixtures.ts`: one fixtures file, typed only with imported `ai` v7.0.176 types (`UIMessage`, `ToolUIPart`) and `lib/agent/types.ts` types. Nothing shared is redeclared. Model id `gpt-5` (OpenAI is the first provider). It covers:
+    - two conversations: one done, with reasoning, three completed tool calls and the reply; one still streaming, with streaming reasoning, a failed edit, a tool call whose input is streaming, and streaming text
+    - tool parts in `input-streaming`, `input-available`, `output-available` and `output-error`
+    - `DeniedCall` for each reason: `outside-project`, `not-allowlisted`, `user-denied`
+    - a pending `package.json` approval as a `ToolCallRecord`
+    - `VerifyResult` passed, plus typecheck, build and runtime failures
+    - a two-file `TurnRecord['diff']` with `filesTouched`, a `Checkpoint`, and preview `loading`, `ready` and `error`
+  - `apps/web/src/app/dev/ai/page.tsx`: `/dev/ai`, one section per component, one labelled block per state. It calls `notFound()` in production. Each state shows its raw fixture for now; items 3 to 9 swap in the real component. Code blocks have their borders removed, as the borderless rule requires.
+  - `bun run typecheck`: exit 0 on two clean runs (tsbuildinfo removed before the second). `npx react-doctor@latest`: 100/100. No console errors; scrollWidth 1280 at 1280px.
+  - Screenshots, checked by eye: `.screenshots/ai-02-fixtures-light.png` and `.screenshots/ai-02-fixtures-dark.png` (full page, every state visible, no borders).
+  - Note: `ProviderId` in types.ts v1 is `'anthropic'` only, while the first provider is OpenAI. Fixtures avoid building a whole `TurnRecord`, so this doesn't block me. AI-CORE will need to widen it.
 - [ ] Conversation and Message, with streaming text and reasoning.
 - [ ] Prompt input upgrade.
 - [ ] Tool call row and denied call.
