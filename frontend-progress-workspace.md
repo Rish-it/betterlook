@@ -42,10 +42,11 @@ Source of component list: `docs/specs/components/` in github.com/meta/astryx.
 
 - No iframe / browser-frame component: native `<iframe>` inside an Astryx container. Not a decision, just noted.
 - No "split pane" component as such: `useResizable` is a hook plus a handle, so the two-pane flex row is a plain StyleX container.
-- [ ] Get the scaffold: FE-A builds `apps/web`. If it isn't on this branch yet, stop the round and end with SUPERSET_WORKER_BLOCKED, needs: "FE-A scaffold". The orchestrator says when to run `git merge betterlook`. Tick once it is merged and root `bun run typecheck` passes.
+- [x] Get the scaffold: FE-A builds `apps/web`. If it isn't on this branch yet, stop the round and end with SUPERSET_WORKER_BLOCKED, needs: "FE-A scaffold". The orchestrator says when to run `git merge betterlook`. Tick once it is merged and root `bun run typecheck` passes.
+  - Merged `betterlook` (ea227024) in 31a9422b; `bun install` done; root `bun run typecheck` exit 0, two runs. No UI, no screenshot. Dev server for FE-B: `cd apps/web && bunx next dev --port 3200`.
 - [ ] Workspace screen at `/workspace`: slim top bar with project name and model picker; chat on the left with the `prompt` search param as the user's message (fixed mock if absent) plus a mock assistant reply, composer pinned at the bottom; live preview on the right as an iframe pointed at a placeholder page served at `/workspace/preview`, with a small toolbar for refresh and open-in-new-tab; resizable divider between chat and preview. Use FE-A's `Composer` and `ModelPicker` if on this branch; otherwise clearly marked placeholders and no imports from `src/composer/`.
 - [ ] Polish: narrow window (~400px), iframe loading, and keyboard use of the divider and toolbar look and work right.
 
 ## Questions
 
-- Blocked on FE-A scaffold: `apps/web` and root `package.json` are not on `fe-workspace`. Waiting for the orchestrator to say when to run `git merge betterlook`.
+- Resolved: FE-A scaffold merged.
