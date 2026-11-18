@@ -15,13 +15,13 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED} from './errors';
+import {CANCELLED_ENDED, CANCELLED_ERROR, CANCELLED_STEP_LIMIT, CANCELLED_STOPPED, errorStatus, NO_CHANGES, OUTPUT_LIMIT, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED, WRITE_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
 import {createTools, proposedDiff, TOOL_DEFINITIONS} from './tools';
 import {hashOf, TRACER_NAME} from './trace';
-import type {AgentMessage, DeniedCall, ToolName, TurnRecord, Usage, VerifyResult} from './types';
+import type {AgentMessage, DeniedCall, ToolCallRecord, ToolName, TurnRecord, Usage, VerifyResult} from './types';
 import {verifyProject} from './verify';
 
 export type AgentChunk = InferUIMessageChunk<AgentMessage>;
@@ -39,9 +39,10 @@ const addUsage = (total: Usage, u: LanguageModelUsage) => {
 
 export function noticeFor(record: TurnRecord): string | undefined {
   if (record.status === 'error') return record.error;
-  if (record.status === 'failed') return VERIFY_FAILED;
+  if (record.status === 'failed') return (record.repairVerify ?? record.verify)?.ok === false ? VERIFY_FAILED : WRITE_FAILED;
   if (record.status === 'unverified') return UNVERIFIED;
   if (record.stepLimitReached && record.status !== 'stopped') return STEP_LIMIT;
+  if (record.status === 'no-changes') return NO_CHANGES;
   return undefined;
 }
 
@@ -50,8 +51,18 @@ const lastUserText = (messages: ModelMessage[]) => {
   return typeof content === 'string' ? content : (content ?? []).map(p => (p.type === 'text' ? p.text : '')).join('');
 };
 
-// A skipped check is never a pass: the turn is only 'passed' when every check ran and passed.
-const checkedStatus = (verify: VerifyResult) => (verify.checks.every(c => c.status === 'passed') ? 'passed' : 'unverified');
+// A write failed when the last write that ran on its path ended in error; a later successful write to the path fixes it.
+function writeFailed(toolCalls: ToolCallRecord[]) {
+  const last = new Map<string, unknown>();
+  for (const c of toolCalls) {
+    if ((c.tool === 'write_file' || c.tool === 'edit_file') && (c.decision === 'allowed' || c.decision === 'approved')) last.set((c.args as {path: string}).path, c.result);
+  }
+  return [...last.values()].some(result => (result as {error?: string} | null)?.error !== undefined);
+}
+
+// A skipped check is never a pass: the turn is only 'passed' when every check ran and passed and no write failed.
+const checkedStatus = (verify: VerifyResult, toolCalls: ToolCallRecord[]) =>
+  writeFailed(toolCalls) ? 'failed' : verify.checks.every(c => c.status === 'passed') ? 'passed' : 'unverified';
 
 export const repairMessage = (verify: VerifyResult) =>
   REPAIR_PROMPT.replace(
@@ -61,6 +72,18 @@ export const repairMessage = (verify: VerifyResult) =>
       .map(c => `${c.name}:\n${c.errors.join('\n')}`)
       .join('\n\n'),
   );
+
+function withOutputLimitErrors(step: ModelMessage[], calls: {toolCallId: string; toolName: string}[]): ModelMessage[] {
+  const ids = new Set(calls.map(c => c.toolCallId));
+  const assistant = step.find(m => m.role === 'assistant');
+  const parts = typeof assistant?.content === 'string' ? [{type: 'text' as const, text: assistant.content}] : (assistant?.content ?? []);
+  const called = new Set(parts.flatMap(p => (p.type === 'tool-call' ? [p.toolCallId] : [])));
+  const results = step.flatMap(m => (m.role === 'tool' ? m.content.filter(p => !(p.type === 'tool-result' && ids.has(p.toolCallId))) : []));
+  return [
+    {...assistant, role: 'assistant', content: [...parts, ...calls.filter(c => !called.has(c.toolCallId)).map(({toolCallId, toolName}) => ({type: 'tool-call' as const, toolCallId, toolName, input: {}}))]},
+    {role: 'tool', content: [...results, ...calls.map(({toolCallId, toolName}) => ({type: 'tool-result' as const, toolCallId, toolName, output: {type: 'error-text' as const, value: OUTPUT_LIMIT}}))]},
+  ];
+}
 
 async function approvalDiff(project: Project, tool: string, input: {path: string; oldString?: string; newString?: string; content?: string}, path: string) {
   if (tool !== 'write_file') return proposedDiff(path, input.oldString ?? '', input.newString ?? '');
@@ -114,6 +137,8 @@ export function runAgent({
     verify: null,
     repairAttempted: false,
     repairVerify: null,
+    steps: [],
+    lengthStops: 0,
     stepLimitReached: false,
     status: 'running',
     checkpoint: null,
@@ -136,6 +161,7 @@ export function runAgent({
     span.setAttributes({
       'langfuse.trace.output': JSON.stringify(record),
       'langfuse.trace.metadata.status': record.status,
+      'langfuse.trace.metadata.lengthStops': record.lengthStops,
       'langfuse.trace.metadata.checkpointId': record.checkpoint?.id ?? '',
     });
     span.end();
@@ -144,6 +170,7 @@ export function runAgent({
 
   const stream = createUIMessageStream<AgentMessage>({
     execute: async ({writer}) => {
+      const tools = project ? createTools(project, record.toolCalls) : undefined;
       const callModel = (callMessages: ModelMessage[]) => {
         let settle: (outcome: Outcome) => void;
         const outcome = new Promise<Outcome>(resolve => (settle = resolve));
@@ -152,14 +179,14 @@ export function runAgent({
             model,
             instructions: SYSTEM_PROMPT || undefined,
             messages: callMessages,
-            stopWhen: isStepCount(AGENT_CONFIG.maxSteps),
+            stopWhen: isStepCount(Math.max(1, AGENT_CONFIG.maxSteps - record.steps.length)),
             maxOutputTokens: AGENT_CONFIG.maxOutputTokens,
             // Claude Sonnet 5.5 400s on non-default sampling, forced toolChoice and disabled thinking, so none are set.
             providerOptions: {
               openai: {store: false, ...(AGENT_CONFIG.promptCachePerProject && project ? {promptCacheKey: project.id} : {})},
-              anthropic: {fallbacks: 'default'},
+              anthropic: {fallbacks: 'default', effort: AGENT_CONFIG.effort, thinking: {type: 'adaptive', display: AGENT_CONFIG.thinkingDisplay}},
             },
-            tools: project ? createTools(project, record.toolCalls) : undefined,
+            tools,
             toolApproval: async ({toolCall}) => {
               if (!project) return undefined;
               const decision = checkPolicy(toolCall.toolName, toolCall.input, project.root);
@@ -198,56 +225,106 @@ export function runAgent({
 
       const settled = (outcome: Outcome) => {
         if (outcome.type === 'end') {
-          addUsage(record.usage, outcome.event.totalUsage);
           if (outcome.event.finishReason === 'content-filter') {
             end({status: 'error', error: REFUSED});
             return false;
           }
-          if (outcome.event.steps.length >= AGENT_CONFIG.maxSteps && outcome.event.finishReason === 'tool-calls') record.stepLimitReached = true;
+          if (record.steps.length >= AGENT_CONFIG.maxSteps && outcome.event.finishReason === 'tool-calls') record.stepLimitReached = true;
           return true;
         }
         end(outcome.type === 'stopped' ? {status: 'stopped'} : {status: 'error', error: userMessage(outcome.error)});
         return false;
       };
 
-      const pipe = async (chunks: ReadableStream<AgentChunk>) => {
-        for await (const chunk of chunks) writer.write(chunk);
+      // Every tool call the client has seen without a terminal chunk yet; approval requests are the only legitimate wait.
+      const open = new Map<string, {toolName: string; input?: unknown; approval?: boolean}>();
+      const track = (chunk: AgentChunk) => {
+        if (chunk.type === 'tool-input-start') open.set(chunk.toolCallId, {toolName: chunk.toolName});
+        else if (chunk.type === 'tool-input-available') open.set(chunk.toolCallId, {toolName: chunk.toolName, input: chunk.input});
+        else if (chunk.type === 'tool-approval-request' && !chunk.isAutomatic) open.set(chunk.toolCallId, {...open.get(chunk.toolCallId)!, approval: true});
+        else if (chunk.type === 'tool-input-error' || chunk.type === 'tool-output-error' || chunk.type === 'tool-output-denied') open.delete(chunk.toolCallId);
+        else if (chunk.type === 'tool-output-available' && !chunk.preliminary) open.delete(chunk.toolCallId);
+      };
+      const closeOpen = (errorText: string) => {
+        const closed = [...open].filter(([, call]) => !call.approval);
+        for (const [toolCallId, call] of closed) {
+          open.delete(toolCallId);
+          writer.write(
+            'input' in call
+              ? {type: 'tool-output-error', toolCallId, errorText}
+              : {type: 'tool-input-error', toolCallId, toolName: call.toolName, input: undefined, errorText},
+          );
+        }
+        return closed.map(([toolCallId, call]) => ({toolCallId, ...call}));
+      };
+      const cancelOpen = (reason: string) => {
+        for (const {toolCallId, ...call} of closeOpen(reason)) {
+          const recorded = record.toolCalls.find(c => c.id === toolCallId);
+          if (recorded) Object.assign(recorded, {decision: 'cancelled', result: reason});
+          else record.toolCalls.push({id: toolCallId, tool: call.toolName, args: call.input ?? null, result: reason, decision: 'cancelled', startedAt: new Date().toISOString(), durationMs: 0});
+        }
+      };
+
+      // A call cut off by maxOutputTokens never runs in the SDK, so it goes back to the model as an error and the turn continues.
+      const runModel = async (callMessages: ModelMessage[], first: boolean) => {
+        for (let sendStart = first; ; sendStart = false) {
+          const call = callModel(callMessages);
+          const chunks = toUIMessageStream<ToolSet, AgentMessage>({
+            stream: call.result.stream,
+            sendStart,
+            sendFinish: false,
+            onError: userMessage,
+            messageMetadata: ({part}) => (part.type === 'start' ? {turnId: record.id, traceId: record.traceId} : undefined),
+          });
+          for await (const chunk of chunks) {
+            track(chunk);
+            writer.write(chunk);
+          }
+          const outcome = await call.outcome;
+          if (outcome.type !== 'end') return {outcome, messages: callMessages};
+          const {steps} = outcome.event;
+          addUsage(record.usage, outcome.event.totalUsage);
+          record.steps.push(...steps.map(s => ({finishReason: s.finishReason, outputTokens: s.usage.outputTokens ?? 0})));
+          record.lengthStops = record.steps.filter(s => s.finishReason === 'length').length;
+          const last = steps.at(-1)!;
+          const invalid = last.content.flatMap(p => (p.type === 'tool-call' && p.invalid ? [{toolCallId: p.toolCallId, toolName: p.toolName}] : []));
+          const cut = outcome.event.finishReason === 'length' && (invalid.length > 0 || [...open.values()].some(c => !c.approval));
+          if (!cut || record.steps.length >= AGENT_CONFIG.maxSteps) {
+            if (cut) record.stepLimitReached = true;
+            cancelOpen(cut ? CANCELLED_STEP_LIMIT : CANCELLED_ENDED);
+            return {outcome, messages: [...callMessages, ...steps.flatMap(s => s.response.messages)]};
+          }
+          const cutResults = withOutputLimitErrors(last.response.messages, [...closeOpen(OUTPUT_LIMIT), ...invalid]);
+          callMessages = [...callMessages, ...steps.slice(0, -1).flatMap(s => s.response.messages), ...cutResults];
+          if (last.content.some(p => p.type === 'tool-approval-request' && !p.isAutomatic)) return {outcome, messages: callMessages};
+        }
       };
 
       try {
         approvalEvents(messages, record.id, record.traceId);
-        const first = callModel(messages);
-        await pipe(
-          toUIMessageStream<ToolSet, AgentMessage>({
-            stream: first.result.stream,
-            sendFinish: false,
-            onError: userMessage,
-            messageMetadata: ({part}) => (part.type === 'start' ? {turnId: record.id, traceId: record.traceId} : undefined),
-          }),
-        );
-        const outcome = await first.outcome;
+        const first = await runModel(messages, true);
+        const outcome = first.outcome;
         if (!settled(outcome) || outcome.type !== 'end') return;
         if (outcome.event.content.some(p => p.type === 'tool-approval-request' && !p.isAutomatic)) return end({status: 'awaiting-approval'});
         if (!project) return end({status: 'passed'});
 
         const saved = await commitTurn(project, record.id);
+        if (!saved) return end({status: 'no-changes'});
         writer.write({type: 'data-checkpoint', id: 'checkpoint', data: saved.checkpoint});
         writer.write({type: 'data-diff', id: 'diff', data: saved.diff});
         const verify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'verify', data: verify});
-        if (verify.ok) return end({status: checkedStatus(verify), verify, checkpoint: saved.checkpoint, ...saved.diff});
+        if (verify.ok) return end({status: checkedStatus(verify, record.toolCalls), verify, checkpoint: saved.checkpoint, ...saved.diff});
 
-        const repair = callModel([...messages, ...(await first.result.response).messages, {role: 'user', content: repairMessage(verify)}]);
-        await pipe(toUIMessageStream<ToolSet, AgentMessage>({stream: repair.result.stream, sendStart: false, sendFinish: false, onError: userMessage}));
-        const repairOutcome = await repair.outcome;
-        if (!settled(repairOutcome)) return;
-        const repaired = await commitTurn(project, record.id, saved.checkpoint.parentId);
+        const repair = await runModel([...first.messages, {role: 'user', content: repairMessage(verify)}], false);
+        if (!settled(repair.outcome)) return;
+        const repaired = (await commitTurn(project, record.id, saved.checkpoint.parentId)) ?? saved;
         writer.write({type: 'data-checkpoint', id: 'checkpoint', data: repaired.checkpoint});
         writer.write({type: 'data-diff', id: 'diff', data: repaired.diff});
         const repairVerify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'repair-verify', data: repairVerify});
         end({
-          status: repairVerify.ok ? checkedStatus(repairVerify) : 'failed',
+          status: repairVerify.ok ? checkedStatus(repairVerify, record.toolCalls) : 'failed',
           verify,
           repairAttempted: true,
           repairVerify,
@@ -260,6 +337,7 @@ export function runAgent({
         if (!record.endedAt) end({status: 'error', error: message});
         writer.write({type: 'error', errorText: message});
       } finally {
+        cancelOpen(record.status === 'stopped' ? CANCELLED_STOPPED : CANCELLED_ERROR);
         writer.write({type: 'finish', messageMetadata: {status: record.status, notice: noticeFor(record)}});
         // Stopped as soon as the turn ends, so the Hobby CPU quota is not spent idling until the timeout.
         if (project?.stop && !keepSandbox) record.sandbox = await project.stop().catch(() => null);

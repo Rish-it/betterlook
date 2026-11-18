@@ -81,7 +81,7 @@ test('allowed tools run in the project; a call outside it is denied, logged, rec
   const secondPrompt = JSON.stringify(model.doStreamCalls[1].prompt);
   expect(secondPrompt).toContain('../../etc/passwd is outside the project folder.');
   expect(secondPrompt).toContain('Edited src/App.tsx.');
-  expect(model.doStreamCalls[0].providerOptions).toEqual({openai: {store: false, promptCacheKey: 'sbx-local'}, anthropic: {fallbacks: 'default'}});
+  expect(model.doStreamCalls[0].providerOptions).toEqual({openai: {store: false, promptCacheKey: 'sbx-local'}, anthropic: {fallbacks: 'default', effort: 'medium', thinking: {type: 'adaptive', display: 'summarized'}}});
 });
 
 async function pauseThenAnswer(approved: boolean) {
@@ -126,4 +126,48 @@ test('a denied approval leaves the file alone, tells the model and logs the deni
   expect(file('package.json')).toBe('{"name":"starter"}\n');
   expect(JSON.stringify(model.doStreamCalls[0].prompt)).toContain('User denied the edit.');
   expect(infos.map(i => JSON.parse(i[1] as string).type)).toEqual(['deny']);
+});
+
+test('parallel writes in one step run one at a time in call order, while reads still overlap', async () => {
+  const {project, file} = setup();
+  let reading = 0;
+  let writing = 0;
+  const peak = {reads: 0, writes: 0};
+  const order: string[] = [];
+  const slow: typeof project = {
+    ...project,
+    read: async p => {
+      peak.reads = Math.max(peak.reads, ++reading);
+      await Bun.sleep(10);
+      reading--;
+      return project.read(p);
+    },
+    write: async (p, c) => {
+      peak.writes = Math.max(peak.writes, ++writing);
+      await Bun.sleep(p.endsWith('a.txt') ? 30 : 5);
+      await project.write(p, c);
+      order.push(p.split('/').at(-1)!);
+      writing--;
+    },
+  };
+  const model = new MockLanguageModelV4({
+    doStream: [
+      toolStep([
+        ['r1', 'read_file', {path: 'src/App.tsx'}],
+        ['r2', 'read_file', {path: 'src/App.tsx'}],
+        ['r3', 'read_file', {path: 'package.json'}],
+      ]),
+      toolStep([
+        ['w1', 'write_file', {path: 'a.txt', content: 'a'}],
+        ['w2', 'write_file', {path: 'b.txt', content: 'b'}],
+        ['w3', 'write_file', {path: 'c.txt', content: 'c'}],
+      ]),
+      textStep('Done.'),
+    ],
+  });
+  const {chunks} = await runTurn({model, messages: [{role: 'user', content: 'add three files'}], project: slow});
+  expect(peak).toEqual({reads: 3, writes: 1});
+  expect(order).toEqual(['a.txt', 'b.txt', 'c.txt']);
+  expect(chunks.filter(c => c.type === 'tool-output-available').map(c => (c as {toolCallId: string}).toolCallId)).toEqual(['r1', 'r2', 'r3', 'w1', 'w2', 'w3']);
+  expect(['a.txt', 'b.txt', 'c.txt'].map(file)).toEqual(['a', 'b', 'c']);
 });

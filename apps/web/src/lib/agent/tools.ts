@@ -97,6 +97,15 @@ async function execute(project: Project, name: ToolName, input: Input, rel: stri
 }
 
 export function createTools(project: Project, toolCalls: ToolCallRecord[]): ToolSet {
+  let writes = Promise.resolve();
+  const writeTurn = async (name: ToolName) => {
+    let release = () => {};
+    if (name !== 'write_file' && name !== 'edit_file') return release;
+    const previous = writes;
+    writes = new Promise(resolve => (release = resolve));
+    await previous;
+    return release;
+  };
   const entries = AGENT_CONFIG.tools.map(name => [
     name,
     tool({
@@ -105,6 +114,7 @@ export function createTools(project: Project, toolCalls: ToolCallRecord[]): Tool
       execute: async (input, {toolCallId}) => {
         const decision = checkPolicy(name, input, project.root);
         if (decision.type === 'deny') throw new Error(decision.message);
+        const release = await writeTurn(name);
         const startedAt = new Date();
         const record: ToolCallRecord = {
           id: toolCallId,
@@ -124,6 +134,7 @@ export function createTools(project: Project, toolCalls: ToolCallRecord[]): Tool
           throw error;
         } finally {
           record.durationMs = Date.now() - startedAt.getTime();
+          release();
         }
       },
     }),

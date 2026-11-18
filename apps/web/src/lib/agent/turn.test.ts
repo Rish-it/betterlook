@@ -5,7 +5,7 @@ import {MockLanguageModelV4} from 'ai/test';
 import {POST as eventsPOST} from '@/app/api/events/route';
 import {POST as restorePOST} from '@/app/api/restore/route';
 import {restoreCheckpoint} from './checkpoint';
-import {UNVERIFIED} from './errors';
+import {NO_CHANGES, UNVERIFIED, WRITE_FAILED} from './errors';
 import {repairMessage} from './run';
 import {runTurn, tempProject, textStep, toolStep, type Scripted} from './test-project';
 import {runtimeErrors} from './verify';
@@ -64,7 +64,12 @@ test('a failed verify gets exactly one repair attempt with the errors, and passe
   });
   const starter = git('rev-parse', 'HEAD');
   const model = new MockLanguageModelV4({
-    doStream: [edit('e1', 'className={1}'), textStep('Done.'), edit('e2', 'className="hero-heading blue"'), textStep('Fixed.')],
+    doStream: [
+      edit('e1', 'className={1}'),
+      textStep('Done.'),
+      toolStep([['e2', 'edit_file', {path: 'src/App.tsx', oldString: 'className={1}', newString: 'className="hero-heading blue"'}]]),
+      textStep('Fixed.'),
+    ],
   });
   const {chunks, record} = await runTurn({model, messages: [{role: 'user', content: 'make it blue'}], project});
 
@@ -132,4 +137,35 @@ test('keep is logged through /api/events; restore validates its input', async ()
   expect((await post(eventsPOST, {type: 'restore', turnId: 't1'})).status).toBe(400);
   expect((await post(restorePOST, {sandboxId: 's'})).status).toBe(400);
   expect((await post(restorePOST, {sandboxId: 's', checkpointId: 'abc1234', turnId: 't1'})).status).toBe(503);
+});
+
+test('a turn that changes nothing ends as no-changes, with no commit and no verify', async () => {
+  const {project, calls, git} = setup(() => pass);
+  const model = new MockLanguageModelV4({doStream: [toolStep([['r1', 'read_file', {path: 'src/App.tsx'}]]), textStep('It is already blue.')]});
+  const {chunks, message, record} = await runTurn({model, messages: [{role: 'user', content: 'is it blue?'}], project});
+  expect(record).toMatchObject({status: 'no-changes', checkpoint: null, verify: null, diff: '', filesTouched: []});
+  expect(git('log', '--format=%s')).toBe('starter');
+  expect(calls).toEqual([]);
+  expect(chunks.some(c => c.type === 'data-checkpoint' || c.type === 'data-verify' || c.type === 'data-diff')).toBe(false);
+  expect(message.metadata).toMatchObject({status: 'no-changes', notice: NO_CHANGES});
+});
+
+test('a write whose last attempt failed makes the turn failed; a failed attempt fixed later does not', async () => {
+  const checked = (cmd: string) => (cmd === 'node' ? {exitCode: 0, output: '[]'} : pass);
+  const missing = () => toolStep([['e0', 'edit_file', {path: 'src/App.tsx', oldString: 'not in the file', newString: 'x'}]]);
+
+  const failed = await runTurn({
+    model: new MockLanguageModelV4({doStream: [toolStep([['w1', 'write_file', {path: 'src/extra.ts', content: 'export {};\n'}]]), missing(), textStep('Done.')]}),
+    messages: [{role: 'user', content: 'make it blue'}],
+    project: setup(checked).project,
+  });
+  expect(failed.record).toMatchObject({status: 'failed', verify: {ok: true}, filesTouched: ['src/extra.ts']});
+  expect(failed.message.metadata).toMatchObject({status: 'failed', notice: WRITE_FAILED});
+
+  const fixed = await runTurn({
+    model: new MockLanguageModelV4({doStream: [missing(), edit('e1', 'className="hero-heading blue"'), textStep('Done.')]}),
+    messages: [{role: 'user', content: 'make it blue'}],
+    project: setup(checked).project,
+  });
+  expect(fixed.record.status).toBe('passed');
 });

@@ -11,13 +11,14 @@ async function git(project: Project, args: string[]) {
 
 const head = (project: Project) => git(project, ['rev-parse', 'HEAD']);
 
-export async function commitTurn(project: Project, turnId: string, base?: string): Promise<{checkpoint: Checkpoint; diff: TurnDiff}> {
+export async function commitTurn(project: Project, turnId: string, base?: string): Promise<{checkpoint: Checkpoint; diff: TurnDiff} | null> {
   await git(project, ['add', '-A']);
+  if (!(await git(project, ['diff', '--cached', '--name-only']))) return null;
   const parentId = await head(project);
   const from = base ?? parentId;
   const diff = await git(project, ['diff', '--cached', from]);
   const filesTouched = (await git(project, ['diff', '--cached', '--name-only', from])).split('\n').filter(Boolean);
-  await git(project, ['commit', '-q', '--allow-empty', '-m', `turn ${turnId}`]);
+  await git(project, ['commit', '-q', '-m', `turn ${turnId}`]);
   return {
     checkpoint: {id: await head(project), parentId: from, sandboxId: project.id, turnId, createdAt: new Date().toISOString()},
     diff: {diff, filesTouched},

@@ -1,4 +1,4 @@
-import type {UIMessage} from 'ai';
+import type {FinishReason, UIMessage} from 'ai';
 
 export type ProviderId = 'openai' | 'anthropic';
 
@@ -22,7 +22,7 @@ export interface ToolCallRecord {
   tool: string;
   args: unknown;
   result: unknown;
-  decision: 'allowed' | 'denied' | 'approved';
+  decision: 'allowed' | 'denied' | 'approved' | 'cancelled';
   denied?: DeniedCall;
   startedAt: string;
   durationMs: number;
@@ -63,7 +63,7 @@ export interface SandboxUsage {
   durationMs: number | null;
 }
 
-export type TurnStatus = 'running' | 'awaiting-approval' | 'passed' | 'unverified' | 'failed' | 'stopped' | 'error';
+export type TurnStatus = 'running' | 'awaiting-approval' | 'passed' | 'no-changes' | 'unverified' | 'failed' | 'stopped' | 'error';
 
 export interface TurnRecord {
   id: string;
@@ -81,6 +81,8 @@ export interface TurnRecord {
   verify: VerifyResult | null;
   repairAttempted: boolean;
   repairVerify: VerifyResult | null;
+  steps: {finishReason: FinishReason; outputTokens: number}[];
+  lengthStops: number;
   stepLimitReached: boolean;
   status: TurnStatus;
   error?: string;
