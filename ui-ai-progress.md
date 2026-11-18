@@ -104,7 +104,22 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - Screenshots, checked by eye: `.screenshots/ai-06-approval-light.png` and `.screenshots/ai-06-approval-dark.png`.
   - `bun run typecheck`: exit 0 on two clean runs; `bun test`: 2 pass. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
   - Open (it affects wire-up): types.ts v1 has no pending value on `ToolCallRecord.decision`, so the card shows whichever call the turn is `awaiting-approval` on (see Questions).
-- [ ] Verify result and diff view.
+- [x] Verify result and diff view.
+
+  - `components/ai/VerifyResult.tsx`: `{result: VerifyResult}`.
+    - Collapsed, it is one line on a muted tone: a success or error icon and "Checks passed" or "<names> failed" (e.g. "Build, Runtime failed").
+    - Expanded, it shows one row per `VerifyCheck` (`typecheck`, `build`, `runtime`) with its icon and duration, and a failed check's `errors` in wrapped borderless `Code`.
+  - `components/ai/DiffView.tsx`: `{diff: TurnRecord['diff']}`.
+    - Collapsed by default: "2 files changed +3 −1" on a muted tone.
+    - Expanded: one diff block per file, the file path as the block title and its +/− counts in the header, hunks only, with added and removed lines tinted.
+    - I dropped the planned `files` prop. The counts and paths all come from the diff, and `filesTouched` would only add files with no diff body.
+  - `components/ai/diff.ts` (`parseDiff`, `hunks`) and `diff.test.ts`: splits a unified diff per file, counts lines, keeps the hunks only, and uses the old path for a deleted file. `bun test`: 4 pass.
+  - Orchestrator nit fixed (applies to the approval card too): highlighted +/− lines now run the full width of the block. The block is now `width="100%"`, and a diff gets a `title`, so Copy moves into the header rather than taking a column beside the code. Measured: highlighted rows end 0px from the right edge of their code block. The approval card's diff also drops the `---`/`+++` lines (its title already names the file).
+  - Bug caught: Astryx `Collapsible` defaults to `defaultIsOpen: true`. Verify and diff now pass `false`, so a fresh load shows all six collapsed (`aria-expanded=false`). Clicking expands only the one clicked.
+  - Screenshots, checked by eye:
+    - `.screenshots/ai-07-verify-diff-light.png` and `.screenshots/ai-07-verify-diff-dark.png`: passed collapsed; typecheck, build and runtime failed expanded; diff collapsed and expanded
+    - `.screenshots/ai-06-approval-{light,dark}.png`, re-shot
+  - `bun run typecheck`: exit 0 on two clean runs. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
 - [ ] Checkpoint with restore confirm.
 - [ ] Thinking state and preview toolbar.
 - [ ] Wire-up: only once the AI loop has that data, swap mocks for live data in the chat panel and connect approve/deny/restore callbacks; list anything still on mocks.

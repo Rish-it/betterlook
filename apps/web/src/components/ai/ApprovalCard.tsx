@@ -6,6 +6,7 @@ import {HStack} from '@astryxdesign/core/Layout';
 import {Text} from '@astryxdesign/core/Text';
 import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {Code} from './Code';
+import {hunks} from './diff';
 import {summarizeArgs} from './summarize';
 
 type ApprovalCardProps = {
@@ -29,7 +30,7 @@ const styles = stylex.create({
 function proposedChange(args: unknown) {
   const diff = (args as {diff?: unknown} | null)?.diff;
   return typeof diff === 'string'
-    ? {code: diff, language: 'text', isDiff: true}
+    ? {code: hunks(diff), language: 'text', isDiff: true}
     : {code: JSON.stringify(args, null, 2), language: 'json', isDiff: false};
 }
 
@@ -50,7 +51,7 @@ export function ApprovalCard({turnId, call, onEvent}: ApprovalCardProps) {
       <Text type="supporting" color="secondary">
         The agent wants to run {call.tool}. Approve to let it continue, or deny to keep the file as it is.
       </Text>
-      <Code code={change.code} language={change.language} isDiff={change.isDiff} />
+      <Code title={summarizeArgs(call.args)} code={change.code} language={change.language} isDiff={change.isDiff} />
       {choice === null ? (
         <HStack gap={2}>
           <Button label="Approve" variant="primary" size="sm" onClick={() => decide('approve')} />

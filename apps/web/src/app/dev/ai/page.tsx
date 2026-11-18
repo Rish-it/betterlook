@@ -13,6 +13,8 @@ import {Message} from '@/components/ai/Message';
 import {ToolCall} from '@/components/ai/ToolCall';
 import {DeniedCall} from '@/components/ai/DeniedCall';
 import {ApprovalCard} from '@/components/ai/ApprovalCard';
+import {VerifyResult} from '@/components/ai/VerifyResult';
+import {DiffView} from '@/components/ai/DiffView';
 import type {TurnEvent} from '@/lib/agent/types';
 import {Composer} from '@/composer/Composer';
 
@@ -149,14 +151,17 @@ export default function AiDevPage() {
         <Section title="Verify result">
           {Object.entries(f.verifyResults).map(([state, result]) => (
             <State key={state} label={state}>
-              <Fixture value={result} />
+              <VerifyResult result={result} />
             </State>
           ))}
         </Section>
 
         <Section title="Diff view">
-          <State label={f.turnFiles.join(', ')}>
-            <Code language="text" isDiff code={f.turnDiff} />
+          <State label="collapsed (default)">
+            <DiffView diff={f.turnDiff} />
+          </State>
+          <State label="expanded">
+            <DiffView diff={f.turnDiff} />
           </State>
         </Section>
 
