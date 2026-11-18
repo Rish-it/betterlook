@@ -142,7 +142,7 @@ const cancelled = (chunks: AgentChunk[], toolCallId: string) =>
 
 test('Stop cancels a running tool call with a reason, in the stream and the record', async () => {
   const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'});
-  const slow = {...t.project, read: async (p: string) => (await Bun.sleep(300), t.project.read(p))};
+  const slow = {...t.project, read: async (p: string) => (p.endsWith('/src/App.tsx') && (await Bun.sleep(300)), t.project.read(p))};
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 100);
   const model = new MockLanguageModelV4({doStream: [toolStep([['r1', 'read_file', {path: 'src/App.tsx'}]]), textStep('never')]});
@@ -266,4 +266,25 @@ test('a length stop on the last allowed step cancels its calls with the step lim
   } finally {
     t.cleanup();
   }
+});
+
+test('sends the project DESIGN.md before the conversation and records the final message', async () => {
+  const t = tempProject({'DESIGN.md': '| Area | Invariant |', 'src/App.tsx': 'x'});
+  const model = textModel(['Nothing to change.']);
+  const {record} = await runTurn({model, messages: [{role: 'user', content: 'hi'}], project: t.project});
+  const [context, user] = model.doStreamCalls[0].prompt;
+  expect(context).toMatchObject({role: 'user', content: [{type: 'text', text: '<project_file path="DESIGN.md">\n| Area | Invariant |\n</project_file>'}]});
+  expect(user).toMatchObject({role: 'user', content: [{type: 'text', text: 'hi'}]});
+  expect(record.projectContextHash).toMatch(/^[0-9a-f]{16}$/);
+  expect(record.finalMessage).toBe('Nothing to change.');
+  t.cleanup();
+});
+
+test('sends no project context when the project has no DESIGN.md', async () => {
+  const t = tempProject({'src/App.tsx': 'x'});
+  const model = textModel(['ok']);
+  const {record} = await runTurn({model, messages: [{role: 'user', content: 'hi'}], project: t.project});
+  expect(model.doStreamCalls[0].prompt).toHaveLength(1);
+  expect(record.projectContextHash).toBeNull();
+  t.cleanup();
 });

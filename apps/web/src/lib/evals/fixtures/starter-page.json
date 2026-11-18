@@ -1,0 +1,3079 @@
+{
+ "rendered": true,
+ "hero": {
+  "exists": true,
+  "h1Count": 1,
+  "introTag": "p",
+  "introLines": 1,
+  "buttonTag": "button",
+  "ordered": true
+ },
+ "texts": [
+  {
+   "text": "Edit your interface in plain words",
+   "path": "section[data-section=\"hero\"] > h1.hero-title",
+   "family": "\"Geist Pixel Square\", monospace",
+   "parentDisplay": "block",
+   "parentText": "Edit your interface in plain words",
+   "inHeroH1": true,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Describe a change and ",
+   "path": "section[data-section=\"hero\"] > p.hero-intro",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Describe a change and Betterlook edits the real code.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Betterlook",
+   "path": "section[data-section=\"hero\"] > p.hero-intro > span.pixel",
+   "family": "\"Geist Pixel Square\", monospace",
+   "parentDisplay": "inline",
+   "parentText": "Betterlook",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": " edits the real code.",
+   "path": "section[data-section=\"hero\"] > p.hero-intro",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Describe a change and Betterlook edits the real code.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Get started",
+   "path": "section[data-section=\"hero\"] > button.button.button-primary",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Get started",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Why designers use it",
+   "path": "section[data-section=\"features\"] > h2.section-title",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Why designers use it",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Real code",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > h3.card-title",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Real code",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Every edit lands in your React source, not in a mockup.",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Every edit lands in your React source, not in a mockup.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Checked edits",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > h3.card-title",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Checked edits",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "The build, the diff and the page are checked before you hear it worked. ",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "The build, the diff and the page are checked before you hear it worked. Beta",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Beta",
+   "path": "div.cards > article.card > p.card-copy > span.pixel",
+   "family": "\"Geist Pixel Square\", monospace",
+   "parentDisplay": "inline",
+   "parentText": "Beta",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Open access",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > h3.card-title",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Open access",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Script changes from the ",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Script changes from the CLI or call the API.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "CLI",
+   "path": "div.cards > article.card > p.card-copy > span.mono",
+   "family": "\"Geist Mono\", ui-monospace, monospace",
+   "parentDisplay": "inline",
+   "parentText": "CLI",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": " or call the ",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Script changes from the CLI or call the API.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "API",
+   "path": "div.cards > article.card > p.card-copy > span.mono",
+   "family": "\"Geist Mono\", ui-monospace, monospace",
+   "parentDisplay": "inline",
+   "parentText": "API",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": ".",
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Script changes from the CLI or call the API.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Pricing",
+   "path": "section[data-section=\"pricing\"] > h2.section-title",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Pricing",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Team",
+   "path": "div.plans > div.plan > div.plan-inner > h3.card-title",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Team",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "$24 per seat",
+   "path": "div.plans > div.plan > div.plan-inner > p.plan-price",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "$24 per seat",
+   "inHeroH1": false,
+   "hasDigits": true,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Unlimited edits and 5 projects.",
+   "path": "div.plans > div.plan > div.plan-inner > p.card-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Unlimited edits and 5 projects.",
+   "inHeroH1": false,
+   "hasDigits": true,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Choose plan",
+   "path": "div.plans > div.plan > div.plan-inner > button.button.button-secondary",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Choose plan",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "Install with ",
+   "path": "footer[data-section=\"footer\"] > p.footer-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Install with npm. Current release v1.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "npm",
+   "path": "footer[data-section=\"footer\"] > p.footer-copy > span.mono",
+   "family": "\"Geist Mono\", ui-monospace, monospace",
+   "parentDisplay": "inline",
+   "parentText": "npm",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": ". Current release ",
+   "path": "footer[data-section=\"footer\"] > p.footer-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Install with npm. Current release v1.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": "v1",
+   "path": "footer[data-section=\"footer\"] > p.footer-copy > span.mono",
+   "family": "\"Geist Mono\", ui-monospace, monospace",
+   "parentDisplay": "inline",
+   "parentText": "v1",
+   "inHeroH1": false,
+   "hasDigits": true,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  },
+  {
+   "text": ".",
+   "path": "footer[data-section=\"footer\"] > p.footer-copy",
+   "family": "\"Geist Sans\", system-ui, sans-serif",
+   "parentDisplay": "block",
+   "parentText": "Install with npm. Current release v1.",
+   "inHeroH1": false,
+   "hasDigits": false,
+   "numeric": "tabular-nums",
+   "features": "normal"
+  }
+ ],
+ "faces": [
+  {
+   "family": "Geist Sans",
+   "status": "loaded"
+  },
+  {
+   "family": "Geist Mono",
+   "status": "loaded"
+  },
+  {
+   "family": "Geist Pixel Square",
+   "status": "loaded"
+  }
+ ],
+ "fontChecks": {
+  "geist sans": true,
+  "geist mono": true,
+  "geist pixel square": true
+ },
+ "declaredFamilies": [
+  "\"Geist Sans\", system-ui, sans-serif",
+  "\"Geist Pixel Square\", monospace",
+  "\"Geist Mono\", ui-monospace, monospace",
+  "Geist Sans",
+  "Geist Mono",
+  "Geist Pixel Square"
+ ],
+ "elements": [
+  {
+   "path": "html",
+   "tag": "html",
+   "text": "",
+   "box": {
+    "x": 0,
+    "y": 0,
+    "width": 1280,
+    "height": 1038
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgb(250, 250, 250)",
+     "rgba": [
+      250,
+      250,
+      250,
+      1
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "html > body",
+   "tag": "body",
+   "text": "",
+   "box": {
+    "x": 0,
+    "y": 0,
+    "width": 1280,
+    "height": 1038
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "html > body > div",
+   "tag": "div",
+   "text": "",
+   "box": {
+    "x": 0,
+    "y": 0,
+    "width": 1280,
+    "height": 1038
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "html > body > div > main.page",
+   "tag": "main",
+   "text": "",
+   "box": {
+    "x": 0,
+    "y": 0,
+    "width": 1280,
+    "height": 1038
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"hero\"]",
+   "tag": "section",
+   "text": "",
+   "box": {
+    "x": 24,
+    "y": 0,
+    "width": 1232,
+    "height": 264
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"hero\"] > h1.hero-title",
+   "tag": "h1",
+   "text": "Edit your interface in plain words",
+   "box": {
+    "x": 199.390625,
+    "y": 96,
+    "width": 881.21875,
+    "height": 73
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": true,
+   "body": false,
+   "wrapStyle": "balance",
+   "fontSize": 56,
+   "letterSpacing": -1.12,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"hero\"] > p.hero-intro",
+   "tag": "p",
+   "text": "Describe a change and  edits the real code.",
+   "box": {
+    "x": 419.96875,
+    "y": 185,
+    "width": 440.0625,
+    "height": 23
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": true,
+   "wrapStyle": "pretty",
+   "fontSize": 18,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"hero\"] > p.hero-intro > span.pixel",
+   "tag": "span",
+   "text": "Betterlook",
+   "box": {
+    "x": 611.75,
+    "y": 185,
+    "width": 88.25,
+    "height": 23
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "pretty",
+   "fontSize": 18,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"hero\"] > button.button.button-primary",
+   "tag": "button",
+   "text": "Get started",
+   "box": {
+    "x": 577.5,
+    "y": 224,
+    "width": 124.984375,
+    "height": 40
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(250, 250, 250)",
+     "rgba": [
+      250,
+      250,
+      250,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": true,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"]",
+   "tag": "section",
+   "text": "",
+   "box": {
+    "x": 160,
+    "y": 328,
+    "width": 960,
+    "height": 207
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > h2.section-title",
+   "tag": "h2",
+   "text": "Why designers use it",
+   "box": {
+    "x": 160,
+    "y": 328,
+    "width": 960,
+    "height": 41
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": true,
+   "body": false,
+   "wrapStyle": "balance",
+   "fontSize": 32,
+   "letterSpacing": -0.64,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards",
+   "tag": "div",
+   "text": "",
+   "box": {
+    "x": 160,
+    "y": 393,
+    "width": 960,
+    "height": 142
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card",
+   "tag": "article",
+   "text": "",
+   "box": {
+    "x": 160,
+    "y": 393,
+    "width": 309.328125,
+    "height": 142
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgb(255, 255, 255)",
+     "rgba": [
+      255,
+      255,
+      255,
+      1
+     ]
+    },
+    {
+     "prop": "box-shadow",
+     "raw": "rgba(0, 0, 0, 0.08)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0.0784313725490196
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card > h3.card-title",
+   "tag": "h3",
+   "text": "Real code",
+   "box": {
+    "x": 184,
+    "y": 417,
+    "width": 261.328125,
+    "height": 23
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": true,
+   "body": false,
+   "wrapStyle": "balance",
+   "fontSize": 18,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "tag": "p",
+   "text": "Every edit lands in your React source, not in a mockup.",
+   "box": {
+    "x": 184,
+    "y": 448,
+    "width": 261.328125,
+    "height": 42
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": true,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card",
+   "tag": "article",
+   "text": "",
+   "box": {
+    "x": 485.328125,
+    "y": 393,
+    "width": 309.328125,
+    "height": 142
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgb(255, 255, 255)",
+     "rgba": [
+      255,
+      255,
+      255,
+      1
+     ]
+    },
+    {
+     "prop": "box-shadow",
+     "raw": "rgba(0, 0, 0, 0.08)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0.0784313725490196
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card > h3.card-title",
+   "tag": "h3",
+   "text": "Checked edits",
+   "box": {
+    "x": 509.328125,
+    "y": 417,
+    "width": 261.328125,
+    "height": 23
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": true,
+   "body": false,
+   "wrapStyle": "balance",
+   "fontSize": 18,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "tag": "p",
+   "text": "The build, the diff and the page are checked before you hear it worked.",
+   "box": {
+    "x": 509.328125,
+    "y": 448,
+    "width": 261.328125,
+    "height": 63
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": true,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "div.cards > article.card > p.card-copy > span.pixel",
+   "tag": "span",
+   "text": "Beta",
+   "box": {
+    "x": 570.8125,
+    "y": 490,
+    "width": 34.0625,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card",
+   "tag": "article",
+   "text": "",
+   "box": {
+    "x": 810.65625,
+    "y": 393,
+    "width": 309.34375,
+    "height": 142
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgb(255, 255, 255)",
+     "rgba": [
+      255,
+      255,
+      255,
+      1
+     ]
+    },
+    {
+     "prop": "box-shadow",
+     "raw": "rgba(0, 0, 0, 0.08)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0.0784313725490196
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card > h3.card-title",
+   "tag": "h3",
+   "text": "Open access",
+   "box": {
+    "x": 834.65625,
+    "y": 417,
+    "width": 261.34375,
+    "height": 23
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": true,
+   "body": false,
+   "wrapStyle": "balance",
+   "fontSize": 18,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"features\"] > div.cards > article.card > p.card-copy",
+   "tag": "p",
+   "text": "Script changes from the  or call the .",
+   "box": {
+    "x": 834.65625,
+    "y": 448,
+    "width": 261.34375,
+    "height": 42
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": true,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "div.cards > article.card > p.card-copy > span.mono",
+   "tag": "span",
+   "text": "CLI",
+   "box": {
+    "x": 1015.046875,
+    "y": 448,
+    "width": 28.8125,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "div.cards > article.card > p.card-copy > span.mono",
+   "tag": "span",
+   "text": "API",
+   "box": {
+    "x": 862.765625,
+    "y": 469,
+    "width": 28.8125,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"pricing\"]",
+   "tag": "section",
+   "text": "",
+   "box": {
+    "x": 160,
+    "y": 599,
+    "width": 960,
+    "height": 290
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"pricing\"] > h2.section-title",
+   "tag": "h2",
+   "text": "Pricing",
+   "box": {
+    "x": 160,
+    "y": 599,
+    "width": 960,
+    "height": 41
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": true,
+   "body": false,
+   "wrapStyle": "balance",
+   "fontSize": 32,
+   "letterSpacing": -0.64,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"pricing\"] > div.plans",
+   "tag": "div",
+   "text": "",
+   "box": {
+    "x": 160,
+    "y": 664,
+    "width": 960,
+    "height": 225
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"pricing\"] > div.plans > div.plan",
+   "tag": "div",
+   "text": "",
+   "box": {
+    "x": 160,
+    "y": 664,
+    "width": 376,
+    "height": 225
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgb(240, 240, 240)",
+     "rgba": [
+      240,
+      240,
+      240,
+      1
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "section[data-section=\"pricing\"] > div.plans > div.plan > div.plan-inner",
+   "tag": "div",
+   "text": "",
+   "box": {
+    "x": 168,
+    "y": 672,
+    "width": 360,
+    "height": 209
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgb(255, 255, 255)",
+     "rgba": [
+      255,
+      255,
+      255,
+      1
+     ]
+    },
+    {
+     "prop": "box-shadow",
+     "raw": "rgba(0, 0, 0, 0.06)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0.058823529411764705
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "rgba(0, 0, 0, 0.06) 0px 0px 0px 1px",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "div.plans > div.plan > div.plan-inner > h3.card-title",
+   "tag": "h3",
+   "text": "Team",
+   "box": {
+    "x": 192,
+    "y": 696,
+    "width": 47.0625,
+    "height": 23
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": true,
+   "body": false,
+   "wrapStyle": "balance",
+   "fontSize": 18,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "div.plans > div.plan > div.plan-inner > p.plan-price",
+   "tag": "p",
+   "text": "$24 per seat",
+   "box": {
+    "x": 192,
+    "y": 731,
+    "width": 186.5625,
+    "height": 41
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": true,
+   "wrapStyle": "pretty",
+   "fontSize": 32,
+   "letterSpacing": -0.64,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "div.plans > div.plan > div.plan-inner > p.card-copy",
+   "tag": "p",
+   "text": "Unlimited edits and 5 projects.",
+   "box": {
+    "x": 192,
+    "y": 784,
+    "width": 220.796875,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(82, 82, 82)",
+     "rgba": [
+      82,
+      82,
+      82,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": true,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "div.plans > div.plan > div.plan-inner > button.button.button-secondary",
+   "tag": "button",
+   "text": "Choose plan",
+   "box": {
+    "x": 192,
+    "y": 817,
+    "width": 133.265625,
+    "height": 40
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(23, 23, 23)",
+     "rgba": [
+      23,
+      23,
+      23,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgb(229, 229, 229)",
+     "rgba": [
+      229,
+      229,
+      229,
+      1
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": true,
+   "iconOnly": false
+  },
+  {
+   "path": "footer[data-section=\"footer\"]",
+   "tag": "footer",
+   "text": "",
+   "box": {
+    "x": 160,
+    "y": 953,
+    "width": 960,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "auto",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": false,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "footer[data-section=\"footer\"] > p.footer-copy",
+   "tag": "p",
+   "text": "Install with . Current release .",
+   "box": {
+    "x": 160,
+    "y": 953,
+    "width": 960,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(115, 115, 115)",
+     "rgba": [
+      115,
+      115,
+      115,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": true,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "footer[data-section=\"footer\"] > p.footer-copy > span.mono",
+   "tag": "span",
+   "text": "npm",
+   "box": {
+    "x": 244.046875,
+    "y": 953,
+    "width": 28.8125,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(115, 115, 115)",
+     "rgba": [
+      115,
+      115,
+      115,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  },
+  {
+   "path": "footer[data-section=\"footer\"] > p.footer-copy > span.mono",
+   "tag": "span",
+   "text": "v1",
+   "box": {
+    "x": 396.359375,
+    "y": 953,
+    "width": 19.203125,
+    "height": 21
+   },
+   "colors": [
+    {
+     "prop": "color",
+     "raw": "rgb(115, 115, 115)",
+     "rgba": [
+      115,
+      115,
+      115,
+      1
+     ]
+    },
+    {
+     "prop": "background-color",
+     "raw": "rgba(0, 0, 0, 0)",
+     "rgba": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "borders": [
+    {
+     "side": "top",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "right",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "bottom",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    },
+    {
+     "side": "left",
+     "width": 0,
+     "style": "none",
+     "alpha": 1
+    }
+   ],
+   "outline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   },
+   "boxShadow": "none",
+   "opacity": 1,
+   "heading": false,
+   "body": false,
+   "wrapStyle": "pretty",
+   "fontSize": 16,
+   "letterSpacing": 0,
+   "hasOwnText": true,
+   "interactive": false,
+   "iconOnly": false
+  }
+ ],
+ "hrCount": 0,
+ "html": {
+  "background": [
+   250,
+   250,
+   250,
+   1
+  ],
+  "backgroundImage": "none",
+  "fontSmoothing": "antialiased"
+ },
+ "nested": [
+  {
+   "outer": "section[data-section=\"pricing\"] > div.plans > div.plan",
+   "inner": "section[data-section=\"pricing\"] > div.plans > div.plan > div.plan-inner",
+   "corners": [
+    {
+     "corner": "top-left",
+     "outerRadius": 16,
+     "innerRadius": 8,
+     "insetX": 8,
+     "insetY": 8
+    },
+    {
+     "corner": "top-right",
+     "outerRadius": 16,
+     "innerRadius": 8,
+     "insetX": 8,
+     "insetY": 8
+    },
+    {
+     "corner": "bottom-right",
+     "outerRadius": 16,
+     "innerRadius": 8,
+     "insetX": 8,
+     "insetY": 8
+    },
+    {
+     "corner": "bottom-left",
+     "outerRadius": 16,
+     "innerRadius": 8,
+     "insetX": 8,
+     "insetY": 8
+    }
+   ]
+  },
+  {
+   "outer": "section[data-section=\"pricing\"] > div.plans > div.plan > div.plan-inner",
+   "inner": "div.plans > div.plan > div.plan-inner > button.button.button-secondary",
+   "corners": [
+    {
+     "corner": "top-left",
+     "outerRadius": 8,
+     "innerRadius": 8,
+     "insetX": 24,
+     "insetY": 145
+    },
+    {
+     "corner": "top-right",
+     "outerRadius": 8,
+     "innerRadius": 8,
+     "insetX": 202.734375,
+     "insetY": 145
+    },
+    {
+     "corner": "bottom-right",
+     "outerRadius": 8,
+     "innerRadius": 8,
+     "insetX": 202.734375,
+     "insetY": 24
+    },
+    {
+     "corner": "bottom-left",
+     "outerRadius": 8,
+     "innerRadius": 8,
+     "insetX": 24,
+     "insetY": 24
+    }
+   ]
+  }
+ ],
+ "targetBox": null,
+ "pageText": "",
+ "presses": [
+  {
+   "path": "section[data-section=\"hero\"] > button.button.button-primary",
+   "scale": 0.97,
+   "transitionProperty": "transform",
+   "transitionDuration": "0.12s",
+   "reducedProperty": "none",
+   "reducedDuration": "0s",
+   "pressedOutline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   }
+  },
+  {
+   "path": "div.plans > div.plan > div.plan-inner > button.button.button-secondary",
+   "scale": 0.97,
+   "transitionProperty": "transform",
+   "transitionDuration": "0.12s",
+   "reducedProperty": "none",
+   "reducedDuration": "0s",
+   "pressedOutline": {
+    "width": 3,
+    "style": "none",
+    "alpha": 1
+   }
+  }
+ ],
+ "expectations": []
+}

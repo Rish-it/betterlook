@@ -2,7 +2,7 @@ import {execFileSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join, relative} from 'node:path';
-import {readUIMessageStream, simulateReadableStream, type LanguageModel, type ModelMessage} from 'ai';
+import {readUIMessageStream, simulateReadableStream} from 'ai';
 import {convertArrayToReadableStream} from 'ai/test';
 import type {Project} from '../sandbox/project';
 import {runAgent, type AgentChunk} from './run';
@@ -78,7 +78,7 @@ export const textStep = (text: string) => ({
   }),
 });
 
-export async function runTurn(options: {model: Exclude<LanguageModel, string>; messages: ModelMessage[]; project?: Project; abortSignal?: AbortSignal; keepSandbox?: boolean}) {
+export async function runTurn(options: Parameters<typeof runAgent>[0]) {
   const {stream, turn} = runAgent(options);
   const chunks: AgentChunk[] = [];
   for await (const chunk of stream) chunks.push(chunk);

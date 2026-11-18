@@ -12,6 +12,8 @@ import {
   type ModelMessage,
   type ToolSet,
 } from 'ai';
+import {HOOK_PATH, type HookJob} from '../evals/collect';
+import {installHook, LIVE_CONTEXT, readEvidence, scoreTurn, writeFailed} from '../evals/turn';
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
@@ -46,19 +48,17 @@ export function noticeFor(record: TurnRecord): string | undefined {
   return undefined;
 }
 
+// DESIGN.md from the project root, sent every turn right after the cached prefix (tools and system). Data only, no instructions.
+export const PROJECT_CONTEXT_FILE = 'DESIGN.md';
+export const projectContextMessage = (content: string): ModelMessage => ({
+  role: 'user',
+  content: `<project_file path="${PROJECT_CONTEXT_FILE}">\n${content}\n</project_file>`,
+});
+
 const lastUserText = (messages: ModelMessage[]) => {
   const content = messages.findLast(m => m.role === 'user')?.content;
   return typeof content === 'string' ? content : (content ?? []).map(p => (p.type === 'text' ? p.text : '')).join('');
 };
-
-// A write failed when the last write that ran on its path ended in error; a later successful write to the path fixes it.
-function writeFailed(toolCalls: ToolCallRecord[]) {
-  const last = new Map<string, unknown>();
-  for (const c of toolCalls) {
-    if ((c.tool === 'write_file' || c.tool === 'edit_file') && (c.decision === 'allowed' || c.decision === 'approved')) last.set((c.args as {path: string}).path, c.result);
-  }
-  return [...last.values()].some(result => (result as {error?: string} | null)?.error !== undefined);
-}
 
 // A skipped check is never a pass: the turn is only 'passed' when every check ran and passed and no write failed.
 const checkedStatus = (verify: VerifyResult, toolCalls: ToolCallRecord[]) =>
@@ -112,12 +112,15 @@ export function runAgent({
   project,
   abortSignal,
   keepSandbox = false,
+  evals,
 }: {
   model: Exclude<LanguageModel, string>;
   messages: ModelMessage[];
   project?: Project;
   abortSignal?: AbortSignal;
   keepSandbox?: boolean;
+  // job: the collector run inside verify's browser session. live: also read the rest of the evidence and score the turn (Trigger A).
+  evals?: {job: HookJob; live: boolean};
 }) {
   const span = trace.getTracer(TRACER_NAME).startSpan('betterlook.turn');
   const spanContext = trace.setSpan(context.active(), span);
@@ -139,6 +142,9 @@ export function runAgent({
     repairVerify: null,
     steps: [],
     lengthStops: 0,
+    projectContextHash: null,
+    finalMessage: null,
+    evals: null,
     stepLimitReached: false,
     status: 'running',
     checkpoint: null,
@@ -163,6 +169,7 @@ export function runAgent({
       'langfuse.trace.metadata.status': record.status,
       'langfuse.trace.metadata.lengthStops': record.lengthStops,
       'langfuse.trace.metadata.checkpointId': record.checkpoint?.id ?? '',
+      ...(record.evals ? {'langfuse.trace.metadata.addedVerifyMs': record.evals.addedVerifyMs} : {}),
     });
     span.end();
     resolveTurn(record);
@@ -284,6 +291,7 @@ export function runAgent({
           if (outcome.type !== 'end') return {outcome, messages: callMessages};
           const {steps} = outcome.event;
           addUsage(record.usage, outcome.event.totalUsage);
+          record.finalMessage = outcome.event.text;
           record.steps.push(...steps.map(s => ({finishReason: s.finishReason, outputTokens: s.usage.outputTokens ?? 0})));
           record.lengthStops = record.steps.filter(s => s.finishReason === 'length').length;
           const last = steps.at(-1)!;
@@ -300,32 +308,55 @@ export function runAgent({
         }
       };
 
+      let hookMs = 0;
+      const verify = async (p: Project) => {
+        if (!evals) return verifyProject(p);
+        const started = Date.now();
+        await installHook(p, evals.job);
+        hookMs += Date.now() - started;
+        return verifyProject(p, HOOK_PATH);
+      };
+      // Scores the finished turn from recorded evidence while the sandbox is still up; publishing happens after the turn.
+      const done = async (patch: Partial<TurnRecord>) => {
+        end(patch);
+        if (!evals?.live || !project) return;
+        const started = Date.now();
+        try {
+          const evidence = await readEvidence(project, record);
+          record.evals = {results: scoreTurn(record, evidence, LIVE_CONTEXT), addedVerifyMs: hookMs + evidence.collectMs + Date.now() - started};
+        } catch (error) {
+          record.evals = {results: [], addedVerifyMs: hookMs + Date.now() - started, error: error instanceof Error ? error.message : 'unknown'};
+        }
+      };
+
       try {
         approvalEvents(messages, record.id, record.traceId);
-        const first = await runModel(messages, true);
+        const design = project ? await project.read(`${project.root}/${PROJECT_CONTEXT_FILE}`).catch(() => null) : null;
+        if (design) record.projectContextHash = hashOf(design);
+        const first = await runModel(design ? [projectContextMessage(design), ...messages] : messages, true);
         const outcome = first.outcome;
         if (!settled(outcome) || outcome.type !== 'end') return;
         if (outcome.event.content.some(p => p.type === 'tool-approval-request' && !p.isAutomatic)) return end({status: 'awaiting-approval'});
         if (!project) return end({status: 'passed'});
 
         const saved = await commitTurn(project, record.id);
-        if (!saved) return end({status: 'no-changes'});
+        if (!saved) return await done({status: 'no-changes'});
         writer.write({type: 'data-checkpoint', id: 'checkpoint', data: saved.checkpoint});
         writer.write({type: 'data-diff', id: 'diff', data: saved.diff});
-        const verify = await verifyProject(project);
-        writer.write({type: 'data-verify', id: 'verify', data: verify});
-        if (verify.ok) return end({status: checkedStatus(verify, record.toolCalls), verify, checkpoint: saved.checkpoint, ...saved.diff});
+        const firstVerify = await verify(project);
+        writer.write({type: 'data-verify', id: 'verify', data: firstVerify});
+        if (firstVerify.ok) return await done({status: checkedStatus(firstVerify, record.toolCalls), verify: firstVerify, checkpoint: saved.checkpoint, ...saved.diff});
 
-        const repair = await runModel([...first.messages, {role: 'user', content: repairMessage(verify)}], false);
+        const repair = await runModel([...first.messages, {role: 'user', content: repairMessage(firstVerify)}], false);
         if (!settled(repair.outcome)) return;
         const repaired = (await commitTurn(project, record.id, saved.checkpoint.parentId)) ?? saved;
         writer.write({type: 'data-checkpoint', id: 'checkpoint', data: repaired.checkpoint});
         writer.write({type: 'data-diff', id: 'diff', data: repaired.diff});
-        const repairVerify = await verifyProject(project);
+        const repairVerify = await verify(project);
         writer.write({type: 'data-verify', id: 'repair-verify', data: repairVerify});
-        end({
+        await done({
           status: repairVerify.ok ? checkedStatus(repairVerify, record.toolCalls) : 'failed',
-          verify,
+          verify: firstVerify,
           repairAttempted: true,
           repairVerify,
           checkpoint: repaired.checkpoint,
