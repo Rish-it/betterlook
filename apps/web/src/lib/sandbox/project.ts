@@ -1,5 +1,6 @@
 import {posix} from 'node:path';
 import type {Sandbox} from '@vercel/sandbox';
+import type {SandboxUsage} from '../agent/types';
 import {CHECKER_ENV} from './runtime-check';
 
 export interface Project {
@@ -11,6 +12,7 @@ export interface Project {
   write(path: string, content: string): Promise<void>;
   search(query: string, dir: string): Promise<string>;
   run(cmd: string, args: string[]): Promise<{exitCode: number; output: string}>;
+  stop?(): Promise<SandboxUsage>;
 }
 
 const SKIP = ['-not', '-path', '*/node_modules/*', '-not', '-path', '*/.git/*', '-not', '-path', '*/dist/*'];

@@ -15,7 +15,7 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, REFUSED, SANDBOX_FAILED, STEP_LIMIT, userMessage, VERIFY_FAILED} from './errors';
+import {errorStatus, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
@@ -40,6 +40,7 @@ const addUsage = (total: Usage, u: LanguageModelUsage) => {
 export function noticeFor(record: TurnRecord): string | undefined {
   if (record.status === 'error') return record.error;
   if (record.status === 'failed') return VERIFY_FAILED;
+  if (record.status === 'unverified') return UNVERIFIED;
   if (record.stepLimitReached && record.status !== 'stopped') return STEP_LIMIT;
   return undefined;
 }
@@ -48,6 +49,9 @@ const lastUserText = (messages: ModelMessage[]) => {
   const content = messages.findLast(m => m.role === 'user')?.content;
   return typeof content === 'string' ? content : (content ?? []).map(p => (p.type === 'text' ? p.text : '')).join('');
 };
+
+// A skipped check is never a pass: the turn is only 'passed' when every check ran and passed.
+const checkedStatus = (verify: VerifyResult) => (verify.checks.every(c => c.status === 'passed') ? 'passed' : 'unverified');
 
 export const repairMessage = (verify: VerifyResult) =>
   REPAIR_PROMPT.replace(
@@ -84,11 +88,13 @@ export function runAgent({
   messages,
   project,
   abortSignal,
+  keepSandbox = false,
 }: {
   model: Exclude<LanguageModel, string>;
   messages: ModelMessage[];
   project?: Project;
   abortSignal?: AbortSignal;
+  keepSandbox?: boolean;
 }) {
   const span = trace.getTracer(TRACER_NAME).startSpan('betterlook.turn');
   const spanContext = trace.setSpan(context.active(), span);
@@ -111,6 +117,7 @@ export function runAgent({
     stepLimitReached: false,
     status: 'running',
     checkpoint: null,
+    sandbox: null,
     startedAt: new Date().toISOString(),
     endedAt: null,
   };
@@ -124,8 +131,8 @@ export function runAgent({
 
   let resolveTurn: (turn: TurnRecord) => void;
   const turn = new Promise<TurnRecord>(resolve => (resolveTurn = resolve));
-  const end = (patch: Partial<TurnRecord>) => {
-    Object.assign(record, patch, {endedAt: new Date().toISOString()});
+  const end = (patch: Partial<TurnRecord>) => void Object.assign(record, patch, {endedAt: new Date().toISOString()});
+  const finalize = () => {
     span.setAttributes({
       'langfuse.trace.output': JSON.stringify(record),
       'langfuse.trace.metadata.status': record.status,
@@ -228,7 +235,7 @@ export function runAgent({
         writer.write({type: 'data-diff', id: 'diff', data: saved.diff});
         const verify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'verify', data: verify});
-        if (verify.ok) return end({status: 'passed', verify, checkpoint: saved.checkpoint, ...saved.diff});
+        if (verify.ok) return end({status: checkedStatus(verify), verify, checkpoint: saved.checkpoint, ...saved.diff});
 
         const repair = callModel([...messages, ...(await first.result.response).messages, {role: 'user', content: repairMessage(verify)}]);
         await pipe(toUIMessageStream<ToolSet, AgentMessage>({stream: repair.result.stream, sendStart: false, sendFinish: false, onError: userMessage}));
@@ -240,7 +247,7 @@ export function runAgent({
         const repairVerify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'repair-verify', data: repairVerify});
         end({
-          status: repairVerify.ok ? 'passed' : 'failed',
+          status: repairVerify.ok ? checkedStatus(repairVerify) : 'failed',
           verify,
           repairAttempted: true,
           repairVerify,
@@ -249,10 +256,14 @@ export function runAgent({
         });
       } catch (error) {
         console.error('[agent] turn failed:', error instanceof Error ? error.message : 'unknown');
-        if (!record.endedAt) end({status: 'error', error: SANDBOX_FAILED});
-        writer.write({type: 'error', errorText: SANDBOX_FAILED});
+        const message = sandboxMessage(error);
+        if (!record.endedAt) end({status: 'error', error: message});
+        writer.write({type: 'error', errorText: message});
       } finally {
         writer.write({type: 'finish', messageMetadata: {status: record.status, notice: noticeFor(record)}});
+        // Stopped as soon as the turn ends, so the Hobby CPU quota is not spent idling until the timeout.
+        if (project?.stop && !keepSandbox) record.sandbox = await project.stop().catch(() => null);
+        finalize();
       }
     },
     onError: userMessage,

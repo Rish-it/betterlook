@@ -11,7 +11,13 @@ export const AGENT_CONFIG = {
 } as const;
 
 export const RUNNER_CONFIG = {
-  concurrency: 2,
+  concurrency: 3,
   maxAttempts: 3,
   backoffMs: 5_000,
+} as const;
+
+export const SANDBOX_CONFIG = {
+  vcpus: 2,
+  timeoutMs: 10 * 60_000,
+  snapshotExpirationMs: 7 * 24 * 60 * 60_000,
 } as const;

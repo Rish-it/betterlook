@@ -6,10 +6,10 @@ import type {Project} from '../sandbox/project';
 import {CHECKER_DIR, CHECKER_SCRIPT} from '../sandbox/runtime-check';
 import {PREVIEW_PORT} from '../sandbox/starter';
 import {RUNNER_CONFIG} from './config';
-import {RATE_LIMITED} from './errors';
+import {RATE_LIMITED, SANDBOX_QUOTA, sandboxQuotaExceeded} from './errors';
 import {runAgent} from './run';
 import {maskSecrets} from './trace';
-import type {ProviderCredential, ProviderId, TurnStatus} from './types';
+import type {ProviderCredential, ProviderId, SandboxUsage, TurnRecord, TurnStatus} from './types';
 
 export type Task = {id: string; prompt: string} & Record<string, unknown>;
 export type RunSummary = {taskId: string; run: number; status: TurnStatus; attempts: number; dir: string};
@@ -57,17 +57,26 @@ export async function previewScreenshot(project: Project, sleep: (ms: number) =>
 async function runOnce(task: Task, run: number, outDir: string, deps: Required<Deps>): Promise<RunSummary> {
   for (let attempt = 1; ; attempt++) {
     const project = await deps.project();
-    const before = await deps.capture(project);
-    const {stream, turn} = runAgent({model: deps.model(), messages: [{role: 'user', content: task.prompt}], project});
-    for await (const _ of stream);
-    const record = await turn;
+    let record: TurnRecord;
+    let before: Uint8Array | null;
+    let after: Uint8Array | null = null;
+    let usage: SandboxUsage | null = null;
+    try {
+      before = await deps.capture(project);
+      const {stream, turn} = runAgent({model: deps.model(), messages: [{role: 'user', content: task.prompt}], project, keepSandbox: true});
+      for await (const _ of stream);
+      record = await turn;
+      if (record.error !== RATE_LIMITED) after = await deps.capture(project);
+    } finally {
+      usage = (await project.stop?.().catch(() => null)) ?? null;
+    }
+    record.sandbox = usage;
     if (record.error === RATE_LIMITED && attempt < RUNNER_CONFIG.maxAttempts) {
       const wait = RUNNER_CONFIG.backoffMs * 2 ** (attempt - 1);
       deps.log(`${task.id} run ${run}: rate limited, retrying in ${wait / 1000}s`);
       await deps.sleep(wait);
       continue;
     }
-    const after = await deps.capture(project);
     const dir = join(outDir, task.id, `run-${run}`);
     const json = (value: unknown) => maskSecrets(JSON.stringify(value, null, 2));
     await mkdir(dir, {recursive: true});
@@ -77,7 +86,7 @@ async function runOnce(task: Task, run: number, outDir: string, deps: Required<D
     await writeFile(join(dir, 'verify.json'), json({verify: record.verify, repairAttempted: record.repairAttempted, repairVerify: record.repairVerify}));
     if (before) await writeFile(join(dir, 'before.png'), before);
     if (after) await writeFile(join(dir, 'after.png'), after);
-    deps.log(`${task.id} run ${run}: ${record.status}`);
+    deps.log(`${task.id} run ${run}: ${record.status}, sandbox ${JSON.stringify(record.sandbox)}`);
     return {taskId: task.id, run, status: record.status, attempts: attempt, dir};
   }
 }
@@ -93,12 +102,20 @@ export async function runTasks({
   const jobs = tasks.flatMap(task => Array.from({length: runs}, (_, i) => ({task, run: i + 1})));
   const results: RunSummary[] = [];
   let next = 0;
+  let paused = false;
   const worker = async () => {
-    while (next < jobs.length) {
+    while (!paused && next < jobs.length) {
       const {task, run} = jobs[next++];
-      results.push(await runOnce(task, run, outDir, all));
+      try {
+        results.push(await runOnce(task, run, outDir, all));
+      } catch (error) {
+        if (!sandboxQuotaExceeded(error)) throw error;
+        if (!paused) all.log(SANDBOX_QUOTA);
+        paused = true;
+      }
     }
   };
-  await Promise.all(Array.from({length: Math.min(concurrency, jobs.length)}, worker));
+  const workers = Math.min(concurrency, RUNNER_CONFIG.concurrency, jobs.length);
+  await Promise.all(Array.from({length: workers}, worker));
   return results;
 }

@@ -1,0 +1,2 @@
+# Tests never see apps/web/.env: Next and agent:run load it themselves.
+env = false

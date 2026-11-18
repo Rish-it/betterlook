@@ -1,3 +1,4 @@
+import {SANDBOX_QUOTA, sandboxQuotaExceeded} from '@/lib/agent/errors';
 import {connectSandbox, createSandbox, sandboxConfigured} from '@/lib/sandbox/sandbox';
 
 export async function POST(req: Request) {
@@ -8,6 +9,7 @@ export async function POST(req: Request) {
     return Response.json(await createSandbox());
   } catch (error) {
     console.error('[sandbox] start failed:', error instanceof Error ? error.message : 'unknown');
+    if (sandboxQuotaExceeded(error)) return new Response(SANDBOX_QUOTA, {status: 402});
     return new Response('The preview sandbox could not start. Reload to try again.', {status: 502});
   }
 }
