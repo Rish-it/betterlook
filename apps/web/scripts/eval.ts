@@ -32,10 +32,11 @@ import {createProject, sandboxConfigured} from '../src/lib/sandbox/sandbox';
 import {PREVIEW_PORT, STARTER_FILES} from '../src/lib/sandbox/starter';
 
 const USAGE =
-  'Usage: bun run eval --tasks <file.md> --runs <k> --model <id> [--tag regression] [--no-judge] [--max-usd n] [--baseline summary.json] [--concurrency n] [--out dir] [--dry-run]\n       bun run eval --annotation-queue';
+  'Usage: bun run eval --tasks <file.md> --runs <k> --model <id> [--task <id>] [--tag regression] [--no-judge] [--max-usd n] [--baseline summary.json] [--concurrency n] [--out dir] [--dry-run]\n       bun run eval --annotation-queue';
 const {values} = parseArgs({
   options: {
     tasks: {type: 'string'},
+    task: {type: 'string'},
     runs: {type: 'string', default: '1'},
     model: {type: 'string'},
     tag: {type: 'string'},
@@ -65,7 +66,8 @@ const k = Number(values.runs);
 const taskText = readFileSync(resolve(cwd, values.tasks), 'utf8');
 const TASKSET_HASH = sha256(taskText);
 const STARTER_HASH = sha256(JSON.stringify([STARTER_FILES, CHECKER_SOURCE, CHECKER_PLAYWRIGHT]));
-const tasks = parseTaskMarkdown(taskText).filter(t => !values.tag || ((t.tags as string[] | undefined) ?? []).includes(values.tag));
+const tasks = parseTaskMarkdown(taskText).filter(t => (!values.task || t.id === values.task) && (!values.tag || ((t.tags as string[] | undefined) ?? []).includes(values.tag)));
+if (!tasks.length) throw new Error('No tasks match --task/--tag.');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const outDir = resolve(cwd, values.out ?? `.scratch/evals/${stamp}-${modelId}`);
 mkdirSync(outDir, {recursive: true});
