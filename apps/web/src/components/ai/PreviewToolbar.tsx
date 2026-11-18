@@ -23,9 +23,9 @@ function RefreshGlyph(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-type PreviewToolbarProps = {url: string; status: PreviewStatus; onRefresh(): void};
+type PreviewToolbarProps = {url: string; status: PreviewStatus; message?: string; onRefresh(): void};
 
-export function PreviewToolbar({url, status, onRefresh}: PreviewToolbarProps) {
+export function PreviewToolbar({url, status, message = 'Preview', onRefresh}: PreviewToolbarProps) {
   const dot = DOT[status];
   return (
     <Toolbar
@@ -35,7 +35,7 @@ export function PreviewToolbar({url, status, onRefresh}: PreviewToolbarProps) {
         <HStack gap={2} align="center">
           <StatusDot variant={dot.variant} label={dot.label} isPulsing={dot.isPulsing} />
           <Text type="supporting" color="secondary">
-            Preview
+            {message}
           </Text>
         </HStack>
       }

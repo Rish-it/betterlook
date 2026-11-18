@@ -1,7 +1,6 @@
 'use client';
 
 import {useEffect, useState, type ReactNode} from 'react';
-import type {UIMessage} from 'ai';
 import {notFound} from 'next/navigation';
 import * as stylex from '@stylexjs/stylex';
 import {Heading, Text} from '@astryxdesign/core/Text';
@@ -19,7 +18,8 @@ import {DiffView} from '@/components/ai/DiffView';
 import {Checkpoint} from '@/components/ai/Checkpoint';
 import {Thinking} from '@/components/ai/Thinking';
 import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
-import type {TurnEvent} from '@/lib/agent/types';
+import type {AgentMessage, TurnEvent} from '@/lib/agent/types';
+import type {ApprovalDecision} from '@/components/ai/ApprovalCard';
 import {Composer} from '@/composer/Composer';
 
 const styles = stylex.create({
@@ -54,7 +54,7 @@ function Section({title, children}: {title: string; children: ReactNode}) {
 
 const STREAM_WORDS = 'I found the nav in Header.tsx. Sticky positioning needs a top offset and a background so content does not show through. I am adding position sticky, top 0 and the surface token, then running typecheck again.'.split(' ');
 
-function withStreamedText(messages: UIMessage[], words: number): UIMessage[] {
+function withStreamedText(messages: AgentMessage[], words: number): AgentMessage[] {
   const last = messages[messages.length - 1];
   const done = words >= STREAM_WORDS.length;
   const parts = last.parts.map(p =>
@@ -82,21 +82,28 @@ function StreamingConversation() {
 }
 
 function ApprovalStates() {
-  const [events, setEvents] = useState<TurnEvent[]>([]);
-  const log = (e: TurnEvent) => setEvents(list => [...list, e]);
+  const [decision, setDecision] = useState<ApprovalDecision>('pending');
+  const [decisions, setDecisions] = useState<boolean[]>([]);
   return (
     <>
-      <State label="pending: Approve and Deny">
-        <ApprovalCard turnId={f.approvalTurnId} call={f.approvalCall} onEvent={log} />
+      <State label="pending: Approve and Deny (click to see the decided state)">
+        <ApprovalCard
+          approval={f.approval}
+          decision={decision}
+          onDecide={approved => {
+            setDecisions(list => [...list, approved]);
+            setDecision(approved ? 'approved' : 'denied');
+          }}
+        />
       </State>
-      <State label="pending: click Deny to see the denied state">
-        <ApprovalCard turnId={f.approvalTurnId} call={{...f.approvalCall, id: 'call_pkg_2'}} onEvent={log} />
+      <State label="approved">
+        <ApprovalCard approval={f.approval} decision="approved" onDecide={() => {}} />
       </State>
-      <State label="approved (decision: approved)">
-        <ApprovalCard turnId={f.approvalTurnId} call={{...f.approvalCall, id: 'call_pkg_3', decision: 'approved'}} onEvent={log} />
+      <State label="denied">
+        <ApprovalCard approval={f.approval} decision="denied" onDecide={() => {}} />
       </State>
-      <State label="events emitted">
-        <Code language="json" code={JSON.stringify(events, null, 2)} />
+      <State label="onDecide calls">
+        <Code language="json" code={JSON.stringify(decisions)} />
       </State>
     </>
   );
@@ -121,6 +128,27 @@ function ThinkingSwap() {
         Next line stays put.
       </Text>
     </div>
+  );
+}
+
+function LiveTurn() {
+  const [calls, setCalls] = useState<string[]>([]);
+  return (
+    <>
+      <State label="an AgentMessage with data-denied, data-approval, data-diff, data-verify and data-checkpoint parts">
+        {f.liveTurn.map(m => (
+          <Message
+            key={m.id}
+            message={m}
+            onApproval={(id, approved) => setCalls(list => [...list, `approval ${id} ${approved}`])}
+            onEvent={e => setCalls(list => [...list, `event ${e.type}`])}
+          />
+        ))}
+      </State>
+      <State label="callbacks">
+        <Code language="json" code={JSON.stringify(calls)} />
+      </State>
+    </>
   );
 }
 
@@ -155,6 +183,10 @@ export default function AiDevPage() {
               <Message message={m} />
             </State>
           ))}
+        </Section>
+
+        <Section title="Live turn shape">
+          <LiveTurn />
         </Section>
 
         <Section title="Prompt input">
