@@ -32,5 +32,9 @@
   Commit: `f284d682`. Files: `src/app/page.tsx`, `src/composer/Composer.tsx`, `src/composer/ModelPicker.tsx`, `src/composer/models.ts`.
   `Composer` = Astryx `ChatComposer` + `ChatComposerInput` (handle `focus()` gives `autoFocus`) with `IconButton` attach and `Selector` ModelPicker in `footerActions`; default `ChatSendButton` disabled while empty (checked). Borderless: `elevation="none"` plus StyleX `xstyle` on the composer body (transparent border, no inset hover/focus rings, `--color-background-muted` fill); keyboard focus outline kept. Astryx has no paperclip icon, so attach uses `upload`. react-doctor 100/100.
   Screenshots: `.screenshots/03-landing-light.png`, `03-landing-typed-dark.png` (focused, focus ring visible), `03-landing-rest-light.png`, `03-landing-rest-dark.png` (no borders, tone difference only).
-- [ ] Send transition: submitting the Composer navigates to `/workspace?prompt=…&model=…` per the contract. Prove it with a screenshot of the URL after sending (the route itself is FE-B's and may 404 on your branch; that is fine).
+- [x] Send transition: submitting the Composer navigates to `/workspace?prompt=…&model=…` per the contract. Prove it with a screenshot of the URL after sending (the route itself is FE-B's and may 404 on your branch; that is fine).
+  Commit: `0a195121`. `page.tsx` pushes `/workspace?${new URLSearchParams({prompt, model})}` via `next/navigation`.
+  Checked in Chrome: Shift+Enter adds a newline without sending; Enter sends `"Make the header blue\nand bold"` with `model=gpt-5` after picking GPT-5; clicking Send carries `&`, `%` and `?` intact (`URLSearchParams` encoding).
+  Screenshots: `.screenshots/04-send-enter-url.png`, `.screenshots/04-send-click-url.png` (URL banner injected for the shot; `/workspace` 404s on this branch as expected).
 - [ ] Polish: empty, narrow-window (about 400px) and keyboard states of the landing screen look and work right.
+  Orchestrator review of f284d682: focused composer must not show a ring around the whole box. Show input focus by a slight background tone lift on the composer instead. Keep focus-visible rings on attach, model picker and send. Screenshot both themes.
