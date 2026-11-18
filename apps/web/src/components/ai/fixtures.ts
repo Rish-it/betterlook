@@ -160,9 +160,9 @@ export const verifyResults: Record<'passed' | 'typecheckFailed' | 'buildFailed' 
   passed: {
     ok: true,
     checks: [
-      {name: 'typecheck', ok: true, errors: [], durationMs: 2140},
-      {name: 'build', ok: true, errors: [], durationMs: 6820},
-      {name: 'runtime', ok: true, errors: [], durationMs: 1310},
+      {name: 'typecheck', status: 'passed', errors: [], durationMs: 2140},
+      {name: 'build', status: 'passed', errors: [], durationMs: 6820},
+      {name: 'runtime', status: 'passed', errors: [], durationMs: 1310},
     ],
   },
   typecheckFailed: {
@@ -170,35 +170,35 @@ export const verifyResults: Record<'passed' | 'typecheckFailed' | 'buildFailed' 
     checks: [
       {
         name: 'typecheck',
-        ok: false,
+        status: 'failed',
         errors: ["src/components/Header.tsx(12,7): error TS2322: Type 'string' is not assignable to type 'number'."],
         durationMs: 2290,
       },
-      {name: 'build', ok: true, errors: [], durationMs: 7010},
-      {name: 'runtime', ok: true, errors: [], durationMs: 1280},
+      {name: 'build', status: 'passed', errors: [], durationMs: 7010},
+      {name: 'runtime', status: 'passed', errors: [], durationMs: 1280},
     ],
   },
   buildFailed: {
     ok: false,
     checks: [
-      {name: 'typecheck', ok: true, errors: [], durationMs: 2050},
+      {name: 'typecheck', status: 'passed', errors: [], durationMs: 2050},
       {
         name: 'build',
-        ok: false,
+        status: 'failed',
         errors: ["Module not found: Can't resolve './Sticky' in 'src/components'"],
         durationMs: 4120,
       },
-      {name: 'runtime', ok: false, errors: ['Skipped: build failed.'], durationMs: 0},
+      {name: 'runtime', status: 'skipped', errors: ['Skipped: build failed.'], durationMs: 0},
     ],
   },
   runtimeFailed: {
     ok: false,
     checks: [
-      {name: 'typecheck', ok: true, errors: [], durationMs: 2180},
-      {name: 'build', ok: true, errors: [], durationMs: 6950},
+      {name: 'typecheck', status: 'passed', errors: [], durationMs: 2180},
+      {name: 'build', status: 'passed', errors: [], durationMs: 6950},
       {
         name: 'runtime',
-        ok: false,
+        status: 'failed',
         errors: ["TypeError: Cannot read properties of undefined (reading 'map')\n    at NavLinks (src/components/Header.tsx:18:22)"],
         durationMs: 1450,
       },
