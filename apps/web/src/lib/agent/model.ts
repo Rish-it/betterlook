@@ -1,8 +1,9 @@
 import {createOpenAI} from '@ai-sdk/openai';
+import {MODELS} from './models';
 import type {ProviderCredential, ProviderId} from './types';
 
 export function providerOf(modelId: string): ProviderId | null {
-  return modelId.startsWith('gpt-') ? 'openai' : null;
+  return MODELS.find(m => m.id === modelId)?.provider ?? null;
 }
 
 export function languageModel(modelId: string, credential: ProviderCredential) {

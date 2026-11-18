@@ -4,6 +4,7 @@ import {simulateReadableStream} from 'ai';
 import {MockLanguageModelV4} from 'ai/test';
 import {AGENT_CONFIG} from './config';
 import {languageModel, parseCredential, providerOf} from './model';
+import {MODELS} from './models';
 import {runAgent} from './run';
 
 const usage = {
@@ -50,7 +51,8 @@ test('stops streaming when aborted', async () => {
 });
 
 test('routes models to their provider and rejects mismatches', () => {
-  expect(providerOf('gpt-5')).toBe('openai');
+  expect(providerOf(MODELS[0].id)).toBe('openai');
+  expect(providerOf('gpt-unlisted')).toBeNull();
   expect(providerOf('claude-sonnet-5-5')).toBeNull();
   const model = languageModel('gpt-5', {provider: 'openai', kind: 'api-key', apiKey: 'test'});
   expect(typeof model === 'object' && model.provider).toStartWith('openai');

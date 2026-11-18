@@ -61,11 +61,13 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
 - `0dccdb9a` (orchestrator priority, for AUTH): `ProviderId = 'openai' | 'anthropic'`. OpenAI is the first provider; `anthropic` is reserved for the second.
 
+- Allowed models (orchestrator correction): `apps/web/src/lib/agent/models.ts` exports `MODELS: {id, label, provider}[]` as plain data, safe to import on the client (type-only import of `ProviderId`). OpenAI default first: `gpt-5.5`, then `gpt-5` (both are ids `@ai-sdk/openai@4.0.121` knows; founder can edit the list). `/api/chat` rejects any model not in it (`providerOf` looks it up). AI-UI's picker imports it; `composer/` is untouched.
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:
 
-- **AI-UI (via orchestrator):** the founder asked for an OpenAI model as the picker default. `MODELS` lives in `composer/models.ts` (AI-UI's file); please put an OpenAI model first. Until then the workspace says that non-OpenAI models are not connected yet.
+- Resolved: the picker default moves to AI-UI importing `lib/agent/models.ts` (see types.ts changes). Until AI-UI wires it, `Workspace.tsx` still seeds from `composer/models.ts`, so a non-OpenAI pick shows "<model> is not connected yet."
 
 Original questions:
 
