@@ -6,6 +6,7 @@
     "dev": "bun --cwd apps/web dev",
     "typecheck": "bun --cwd apps/web typecheck",
     "test": "bun --cwd apps/web test",
+    "db:migrate": "bun --cwd apps/web db:migrate",
     "agent:run": "INIT_CWD=$PWD bun --cwd apps/web agent:run"
   }
 }
