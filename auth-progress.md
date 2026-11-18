@@ -18,8 +18,9 @@ Branch `auth`. Dev server port `3600`.
   - Inspected Chrome screenshots at `.screenshots/auth-signed-{in,out}-{light,dark}.png` and `.screenshots/auth-signed-out-narrow-dark.png`. At 400 px there was no horizontal overflow. Keyboard focus was visible and returned to the trigger after Escape, adding a key, and removing a key. Mock sign-out cleared the browser session. A synthetic key stayed masked, was removed from the DOM on submit, and was absent from browser storage.
   - Two clean root typechecks and `bun run test` passed (30 pass, 0 fail per run). `npx react-doctor@latest .` in `apps/web` scored 100/100. The temporary browser preview is for proof only. The orchestrator mounts `AuthControls` in Workspace.
   - LIVE PROOF PENDING ENV: Open the integrated Workspace on the registered origin, complete provider consent with the founder's test account, and confirm the account label, active plan indicator, and sign-out.
-- [x] Hand-off. The browser key reader, server OAuth resolver, and slot-ready UI are ready for the orchestrator's wiring. The mocked Next.js request verified the server returned exactly the OpenAI OAuth credential fields needed by chat. The live account and billing check is deferred per the founder's decision.
-  - LIVE PROOF PENDING ENV: After the orchestrator replaces both credential stubs, mounts `AuthControls`, and applies the approved OpenAI inference settings, send an edit from Workspace using the signed-in test account and confirm `runAgent()` returns a reply under that account's ChatGPT allowance. Repeat with a founder-provided API key and verify API billing.
+- [x] Hand-off. Two mocked Next.js runs passed an OAuth session through `getServerCredential(request)` and AI-CORE's language-model factory to a stub typed with `runAgent`'s actual input. An explicit API key took precedence, and a request without either credential returned 401. The temporary test route returns booleans and the credential kind, with credentials held server-side.
+  - LIVE PROOF PENDING ENV: founder test account + client ID; signed-in request reaches runAgent and gets a reply
+  - Also verify the signed-in turn draws from the account's ChatGPT allowance and repeat with a founder-provided API key to confirm API billing.
 - [ ] Failure states. Verify readable messages and API-key fallback for consent denial, expired and revoked tokens, refresh failure, and provider outage.
 - [ ] Secret hygiene. Verify that logs, screenshots, test output, and traces contain no tokens, client secrets, or `.env` values.
 
@@ -35,7 +36,7 @@ The hosted flow reads `OPENAI_SIWC_CLIENT_ID`, `OPENAI_SIWC_REDIRECT_URI` (exact
 - Send one workspace chat request using ChatGPT plan access and confirm `runAgent()` gets a reply under that user's allowance. Repeat with a founder-provided OpenAI API key and confirm the reply uses API billing.
 - Sign out after live OAuth consent and confirm provider-side disconnection and that the prior session cannot start another subscription-billed turn.
 
-At integration, AI-CORE's chat route should accept only the API-key variant from the request body and resolve OAuth from `getServerCredential(request)`. Its OpenAI Responses SDK adapter currently defaults `store` to `true`; confirm and apply the hosted partner request contract for OAuth. The public plan example requires `store: false` and `stream: true`. Verify the selected model is available to the signed-in account. [Plan inference reference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)
+At integration, AI-CORE's chat route should accept only the API-key variant from the request body and resolve OAuth from `getServerCredential(request)`. AI-CORE's `runAgent` streams Responses and already sets `store: false`, overriding the SDK default. Verify the selected model is available to the signed-in account and confirm the hosted partner's inference contract. [Plan inference reference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)
 
 ## Research — 2026-11-18
 
