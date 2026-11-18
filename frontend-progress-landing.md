@@ -36,5 +36,12 @@
   Commit: `0a195121`. `page.tsx` pushes `/workspace?${new URLSearchParams({prompt, model})}` via `next/navigation`.
   Checked in Chrome: Shift+Enter adds a newline without sending; Enter sends `"Make the header blue\nand bold"` with `model=gpt-5` after picking GPT-5; clicking Send carries `&`, `%` and `?` intact (`URLSearchParams` encoding).
   Screenshots: `.screenshots/04-send-enter-url.png`, `.screenshots/04-send-click-url.png` (URL banner injected for the shot; `/workspace` 404s on this branch as expected).
-- [ ] Polish: empty, narrow-window (about 400px) and keyboard states of the landing screen look and work right.
+- [x] Polish: empty, narrow-window (about 400px) and keyboard states of the landing screen look and work right.
   Orchestrator review of f284d682: focused composer must not show a ring around the whole box. Show input focus by a slight background tone lift on the composer instead. Keep focus-visible rings on attach, model picker and send. Screenshot both themes.
+  Orchestrator: set `devIndicators: false` in `apps/web/next.config.mjs` (dev badge overlaps the composer in screenshots).
+  Commit: `a4163737`.
+  Root cause of missing focus rings: app StyleX emitted the same atomic class names as Astryx (`x1t137rt` = `outline-style:none`) in a later layer, overriding Astryx's `:focus-visible` rule. `classNamePrefix: 'p'` in `babel.config.js` (as Astryx's example does) separates them.
+  Composer: no ring or border when focused; `:focus-within` lifts the fill 5% toward text colour (light 241 to 229, dark 27 to 38). Attach, model picker and send show the Astryx focus-visible ring on Tab. `devIndicators: false` hides the Next badge.
+  Checked at 1280 and 400 px, light and dark: no horizontal scroll at 400 px; Enter on empty or whitespace stays on `/` with Send disabled; Tab order Message, Attach, Model, Send; Enter on Send navigates.
+  Screenshots: `.screenshots/05-{wide,narrow}-{light,dark}-{focused-empty,rest,tab-attach,tab-model,tab-send}.png`.
+  Skipped: favicon (`/favicon.ico` 404 in the console), add when there is an icon.
