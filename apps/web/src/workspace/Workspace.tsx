@@ -1,6 +1,6 @@
 'use client';
 
-import {useRef, useState, type SVGProps} from 'react';
+import {useRef, useState, useSyncExternalStore, type SVGProps} from 'react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
 import {
@@ -28,7 +28,9 @@ const PREVIEW_URL = '/workspace/preview';
 const MOCK_REPLY = 'Got it. Edits are not connected yet, so this is a placeholder reply and nothing in your app changed.';
 const NARROW = '@media (max-width: 640px)';
 
-type Message = {id: number; sender: 'user' | 'assistant'; text: string};
+const noopSubscribe = () => () => {};
+
+type Message = {id: number; sender: 'user' | 'assistant'; text: string; model?: string};
 type View = 'chat' | 'preview';
 
 const styles = stylex.create({
@@ -105,22 +107,22 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     maxSize: '70%',
     containerRef,
   });
-  const [model, setModel] = useState(
-    MODELS.some(m => m.value === initialModel) ? initialModel : MODELS[0].value,
-  );
+  const initialModelValue = MODELS.some(m => m.value === initialModel) ? initialModel : MODELS[0].value;
+  const [model, setModel] = useState(initialModelValue);
   const [messages, setMessages] = useState<Message[]>([
-    {id: 0, sender: 'user', text: prompt},
+    {id: 0, sender: 'user', text: prompt, model: initialModelValue},
     {id: 1, sender: 'assistant', text: MOCK_REPLY},
   ]);
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
+  // A server-rendered iframe can finish loading before hydration and its onLoad is lost.
+  const isHydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
-  const send = (text: string, picked: string) => {
-    setModel(picked);
+  const send = (text: string, sentModel: string) => {
     setMessages(list => [
       ...list,
-      {id: list.length, sender: 'user', text},
+      {id: list.length, sender: 'user', text, model: sentModel},
       {id: list.length + 1, sender: 'assistant', text: MOCK_REPLY},
     ]);
   };
@@ -153,11 +155,22 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
           <section
             aria-label="Chat"
             {...stylex.props(styles.chat(resizable.size), view !== 'chat' && styles.hiddenWhenNarrow)}>
-            <ChatLayout composer={<Composer placeholder="Describe a change" onSubmit={send} />}>
+            <ChatLayout
+              composer={
+                <Composer placeholder="Describe a change" onSubmit={send} model={model} onModelChange={setModel} />
+              }>
               <ChatMessageList>
                 {messages.map(m => (
                   <ChatMessage key={m.id} sender={m.sender}>
-                    <ChatMessageBubble variant={m.sender === 'assistant' ? 'ghost' : 'filled'}>
+                    <ChatMessageBubble
+                      variant={m.sender === 'assistant' ? 'ghost' : 'filled'}
+                      metadata={
+                        m.model && (
+                          <Text type="supporting" color="secondary">
+                            {MODELS.find(x => x.value === m.model)?.label}
+                          </Text>
+                        )
+                      }>
                       {m.text}
                     </ChatMessageBubble>
                   </ChatMessage>
@@ -201,14 +214,16 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                 </>
               }
             />
-            <iframe
-              key={frameKey}
-              title="App preview"
-              src={PREVIEW_URL}
-              sandbox="allow-scripts allow-forms allow-popups"
-              onLoad={() => setIsFrameLoading(false)}
-              {...stylex.props(styles.frame)}
-            />
+            {isHydrated && (
+              <iframe
+                key={frameKey}
+                title="App preview"
+                src={PREVIEW_URL}
+                sandbox="allow-scripts allow-forms allow-popups"
+                onLoad={() => setIsFrameLoading(false)}
+                {...stylex.props(styles.frame)}
+              />
+            )}
             {isFrameLoading && (
               <div {...stylex.props(styles.loading)}>
                 <Spinner size="md" aria-label="Loading preview" />

@@ -49,8 +49,12 @@ Source of component list: `docs/specs/components/` in github.com/meta/astryx.
   - Composer and ModelPicker are marked placeholders (FE-A's not on `betterlook` yet).
   - Preview is a self-contained HTML route (`workspace/preview/route.ts`) in a sandboxed iframe without `allow-same-origin`: Next dev returns 403 to `Origin: null` requests, so a Next page in the strict sandbox lost its CSS and JS; react-doctor flags `allow-scripts` + `allow-same-origin` together.
   - Astryx has no refresh icon; refresh uses a small inline SVG passed to `Icon`, as Astryx's Icon docs direct.
-- [ ] Polish: narrow window (~400px), iframe loading, and keyboard use of the divider and toolbar look and work right.
-  - In progress, not ticked (blocked on Q1 below). Done so far: merged `betterlook` 86718025; FE-A `Composer` and `ModelPicker` replace the placeholders; top-bar picker starts from the `model` param; mock reply is generic; sends in the workspace append to the chat.
+- [x] Polish: narrow window (~400px), iframe loading, and keyboard use of the divider and toolbar look and work right.
+  - Q1 resolved: merged `betterlook` f284ee5a; one model state seeded from `?model=` drives both the top-bar `ModelPicker` and the pinned `Composer` (`model`/`onModelChange`). Picking Gemini in the composer updated the top bar, picking Opus in the top bar updated the composer, next send carried Opus (shown as bubble metadata). `.screenshots/workspace-sync-1440.png`.
+  - Iframe mounts only after hydration so `onLoad` is never lost; before this a fresh load left the spinner stuck. Fresh load x3: spinner cleared each time.
+  - Focus rings rechecked after FE-A's `classNamePrefix` change: toolbar button 2px solid outline (`.screenshots/toolbar-focus-1440.png`), divider focus ring (`.screenshots/divider-focus-1440.png`).
+  - `.screenshots/workspace-1440-light.png`, `.screenshots/workspace-1440-dark.png`: borderless in both themes.
+  - Earlier in this item: merged `betterlook` 86718025; FE-A `Composer` and `ModelPicker` replace the placeholders; top-bar picker starts from the `model` param; mock reply is generic; sends in the workspace append to the chat.
   - `.screenshots/e2e-workspace-1440.png`: typed on `/`, Enter, landed on `/workspace?prompt=Make+the+nav+sticky&model=gpt-5`; message shown, top picker GPT-5.
   - `.screenshots/workspace-400-chat.png`, `.screenshots/workspace-400-preview.png`: below 640px a SegmentedControl switches Chat/Preview, divider hidden, no horizontal scroll (scrollWidth 400). Borderless holds.
   - `.screenshots/divider-focus-1440.png`: divider shows no line at rest, a focus ring only on keyboard focus. Toolbar: ArrowRight moves focus Refresh to Open-in-new-tab.
