@@ -45,7 +45,16 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
   - React Doctor 100/100. No `.env` exists; `grep -rIE "sk-[A-Za-z0-9_-]{16,}" .screenshots apps/web/src` found no match.
   - LIVE PROOF PENDING ENV: with an OpenAI key in the credential, send "hello" from `/workspace?model=gpt-5` and see a streamed reply, then press Stop mid-stream and see the server request abort.
   - Known gap: a reload re-sends the landing prompt. Chat history and sandbox id move to localStorage in the Sandbox item.
-- [ ] BYOK: the key flows the way the founder picked; missing or wrong key shows a clear message.
+- [x] BYOK: the key flows the way the founder picked; missing or wrong key shows a clear message.
+
+  How the key flows: the browser sends `credential` in the `/api/chat` body (from AUTH's `getCredential()`, stubbed to null until it lands). The server resolves `parseCredential(body.credential) ?? await getServerCredential(req)`, builds `createOpenAI({apiKey})` for that one call, and keeps nothing. The ChatGPT OAuth cookie path is AUTH's `getServerCredential`, also stubbed.
+  Built: `lib/agent/errors.ts`, which maps provider errors to fixed messages (401/403: "Your API key or sign-in was rejected. Check it and try again."; anything else: "The model provider returned an error. Try again."). Provider text is never forwarded, because OpenAI's 401 body echoes part of the key. The route passes `onError: userMessage` to `toUIMessageStream`; `runAgent` sets `streamText` `onError` to log only `[agent] model call failed: <status>`, which replaces the SDK default that console-logs the whole error, including the response body.
+  Evidence:
+  - `bun run typecheck` + `bun run test` run 1: pass, run 2: pass (7 tests). New: provider error mapping (401, 403, 500, plain Error); a mock model throwing a 401 whose body echoes a fake key reaches the UI stream as `{type: 'error', errorText: KEY_REJECTED}`, the chunks never contain the fake text, and the only log line is `['[agent] model call failed:', 401]`.
+  - Wrong key, live against OpenAI with a dummy string injected into the request body by the test browser: `.screenshots/byok-wrong-key-1440.png` shows "Your API key or sign-in was rejected. Check it and try again."; server log `[agent] model call failed: 401`, `POST /api/chat 200`.
+  - Missing key: `.screenshots/byok-missing-key-1440.png` shows "Sign in or add an API key to start." (`POST /api/chat 401`), sent after the error, so the chat keeps working.
+  - The dummy key string appears 0 times in the dev server log. No `.env` exists; the secret-pattern grep over `.screenshots/*.log` and `apps/web/src` found no match.
+  - LIVE PROOF PENDING ENV: with AUTH's real `getCredential()` and a valid OpenAI key, a reply streams; with the key removed, "Sign in or add an API key to start." shows; with a revoked key, the rejected message shows.
 - [ ] Turn record and tracing: each turn lands in Langfuse with the required fields; prompt and tool config hashes change on edit; no secret appears in an exported trace.
 - [ ] Sandbox and preview: a fresh sandbox from a minimal React starter, initialized as a git repo; the preview shows it; reload reconnects to the same sandbox.
 - [ ] Tools and policy: the allowlisted tools work; a call outside the project folder is denied, logged and returned to the model as a tool error; a package.json edit pauses for approval.
@@ -81,4 +90,5 @@ Original questions:
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
 
+- BYOK: valid key streams; missing key and revoked key show the two messages (needs AUTH's `getCredential()` and a real key).
 - Agent core: streamed reply from a real OpenAI model at `/workspace?model=gpt-5`; Stop aborts the server request.

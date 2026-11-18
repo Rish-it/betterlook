@@ -1,4 +1,5 @@
 import {convertToModelMessages, createUIMessageStreamResponse, toUIMessageStream, type UIMessage} from 'ai';
+import {userMessage} from '@/lib/agent/errors';
 import {languageModel, parseCredential, providerOf} from '@/lib/agent/model';
 import {runAgent} from '@/lib/agent/run';
 import type {ProviderCredential} from '@/lib/agent/types';
@@ -17,5 +18,5 @@ export async function POST(req: Request) {
     messages: await convertToModelMessages(body.messages),
     abortSignal: req.signal,
   });
-  return createUIMessageStreamResponse({stream: toUIMessageStream({stream: result.stream})});
+  return createUIMessageStreamResponse({stream: toUIMessageStream({stream: result.stream, onError: userMessage})});
 }
