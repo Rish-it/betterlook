@@ -93,7 +93,17 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - `bun run typecheck`: exit 0 on two clean runs. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
   - Orchestrator review fix: Astryx's `CodeBlock` drew an outline and a line under its header. `components/ai/Code.tsx` now wraps `CodeBlock` with `container="section"` (no outline) and `hasLanguageLabel={false}` (no header, so no line), plus a muted tone through `xstyle`. The tool rows, the dev page and the coming approval card and diff view all use it. Checked: no `<pre>` in a code block, or anything inside one, draws a border, pseudo-elements included (16 `<pre>` on the page). Re-shot `.screenshots/ai-05-tools-{light,dark}.png`.
   - Astryx note: `ChatToolCalls` rows are `div role="button"` with key handling, not `<button>`. They are keyboard-usable and expose `aria-expanded`.
-- [ ] Approval card.
+- [x] Approval card.
+
+  - `components/ai/ApprovalCard.tsx`: `{turnId: string; call: ToolCallRecord; onEvent(event: TurnEvent): void}`.
+    - The card shows a title naming the protected file ("Edit a protected file: package.json") and one line of explanation. It sits on an accent-muted tone with no border, and is `role="group"` labelled by its title.
+    - The proposed change shows as a highlighted diff when `args.diff` is a string (`isDiff`, added and removed lines tinted); otherwise it shows the args as JSON. It uses the borderless `Code`.
+    - Approve and Deny are real `Button`s. A click emits `TurnEvent` `{type: 'approve' | 'deny', turnId, toolCallId, at}` and swaps the buttons for a status line (`role="status"`): "Approved. The agent is continuing." or "Denied. The file was not changed."
+    - `decision: 'approved'` renders the approved state directly.
+  - Dev page shows three states (pending, denied after a click, approved) plus the events the callback received. Checked: clicking Deny emitted `{"type":"deny","turnId":"turn_02","toolCallId":"call_pkg_2",…}`, the group's label resolves to its title, the focus ring shows on Approve, and there are no console errors.
+  - Screenshots, checked by eye: `.screenshots/ai-06-approval-light.png` and `.screenshots/ai-06-approval-dark.png`.
+  - `bun run typecheck`: exit 0 on two clean runs; `bun test`: 2 pass. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
+  - Open (it affects wire-up): types.ts v1 has no pending value on `ToolCallRecord.decision`, so the card shows whichever call the turn is `awaiting-approval` on (see Questions).
 - [ ] Verify result and diff view.
 - [ ] Checkpoint with restore confirm.
 - [ ] Thinking state and preview toolbar.

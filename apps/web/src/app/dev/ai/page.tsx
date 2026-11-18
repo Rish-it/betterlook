@@ -12,6 +12,8 @@ import {Conversation} from '@/components/ai/Conversation';
 import {Message} from '@/components/ai/Message';
 import {ToolCall} from '@/components/ai/ToolCall';
 import {DeniedCall} from '@/components/ai/DeniedCall';
+import {ApprovalCard} from '@/components/ai/ApprovalCard';
+import type {TurnEvent} from '@/lib/agent/types';
 import {Composer} from '@/composer/Composer';
 
 const styles = stylex.create({
@@ -72,6 +74,27 @@ function StreamingConversation() {
   );
 }
 
+function ApprovalStates() {
+  const [events, setEvents] = useState<TurnEvent[]>([]);
+  const log = (e: TurnEvent) => setEvents(list => [...list, e]);
+  return (
+    <>
+      <State label="pending: Approve and Deny">
+        <ApprovalCard turnId={f.approvalTurnId} call={f.approvalCall} onEvent={log} />
+      </State>
+      <State label="pending: click Deny to see the denied state">
+        <ApprovalCard turnId={f.approvalTurnId} call={{...f.approvalCall, id: 'call_pkg_2'}} onEvent={log} />
+      </State>
+      <State label="approved (decision: approved)">
+        <ApprovalCard turnId={f.approvalTurnId} call={{...f.approvalCall, id: 'call_pkg_3', decision: 'approved'}} onEvent={log} />
+      </State>
+      <State label="events emitted">
+        <Code language="json" code={JSON.stringify(events, null, 2)} />
+      </State>
+    </>
+  );
+}
+
 export default function AiDevPage() {
   if (process.env.NODE_ENV === 'production') notFound();
 
@@ -120,9 +143,7 @@ export default function AiDevPage() {
         </Section>
 
         <Section title="Approval card">
-          <State label={`pending, ${f.approvalTurnId}`}>
-            <Fixture value={f.approvalCall} />
-          </State>
+          <ApprovalStates />
         </Section>
 
         <Section title="Verify result">
@@ -135,7 +156,7 @@ export default function AiDevPage() {
 
         <Section title="Diff view">
           <State label={f.turnFiles.join(', ')}>
-            <Code language="diff" code={f.turnDiff} />
+            <Code language="text" isDiff code={f.turnDiff} />
           </State>
         </Section>
 
