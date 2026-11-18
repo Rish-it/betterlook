@@ -144,6 +144,7 @@ export function runAgent({
 
   const stream = createUIMessageStream<AgentMessage>({
     execute: async ({writer}) => {
+      const tools = project ? createTools(project, record.toolCalls) : undefined;
       const callModel = (callMessages: ModelMessage[]) => {
         let settle: (outcome: Outcome) => void;
         const outcome = new Promise<Outcome>(resolve => (settle = resolve));
@@ -159,7 +160,7 @@ export function runAgent({
               openai: {store: false, ...(AGENT_CONFIG.promptCachePerProject && project ? {promptCacheKey: project.id} : {})},
               anthropic: {fallbacks: 'default', effort: AGENT_CONFIG.effort, thinking: {type: 'adaptive', display: AGENT_CONFIG.thinkingDisplay}},
             },
-            tools: project ? createTools(project, record.toolCalls) : undefined,
+            tools,
             toolApproval: async ({toolCall}) => {
               if (!project) return undefined;
               const decision = checkPolicy(toolCall.toolName, toolCall.input, project.root);
