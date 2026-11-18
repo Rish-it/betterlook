@@ -10,6 +10,8 @@ import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import * as f from '@/components/ai/fixtures';
 import {Conversation} from '@/components/ai/Conversation';
 import {Message} from '@/components/ai/Message';
+import {ToolCall} from '@/components/ai/ToolCall';
+import {DeniedCall} from '@/components/ai/DeniedCall';
 import {Composer} from '@/composer/Composer';
 
 const styles = stylex.create({
@@ -100,9 +102,9 @@ export default function AiDevPage() {
         </Section>
 
         <Section title="Tool call row">
-          {Object.entries(f.toolParts).map(([state, part]) => (
-            <State key={state} label={part.state}>
-              <Fixture value={part} />
+          {Object.values(f.toolParts).map(part => (
+            <State key={part.toolCallId} label={part.state}>
+              <ToolCall part={part} />
             </State>
           ))}
         </Section>
@@ -110,9 +112,12 @@ export default function AiDevPage() {
         <Section title="Denied call">
           {f.deniedCalls.map(call => (
             <State key={call.reason} label={call.reason}>
-              <Fixture value={call} />
+              <DeniedCall call={call} />
             </State>
           ))}
+          <State label="for contrast: a tool error">
+            <ToolCall part={f.toolParts.error} />
+          </State>
         </Section>
 
         <Section title="Approval card">

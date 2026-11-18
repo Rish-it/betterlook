@@ -79,7 +79,19 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
     - landing composer still renders; no console errors
   - Screenshots, checked by eye: `.screenshots/ai-04-composer-light.png` and `.screenshots/ai-04-composer-dark.png`, showing idle with two attachments and typed text, and streaming (dimmed, Stop shown). Borderless.
   - `bun run typecheck`: exit 0 on two clean runs. `react-doctor`: only the two index-key warnings in `Message.tsx` already judged false positives in item 3.
-- [ ] Tool call row and denied call.
+- [x] Tool call row and denied call.
+
+  - `components/ai/ToolCall.tsx`: `{part: ToolUIPart | DynamicToolUIPart}` on `ChatToolCalls`, one row per call.
+    - Each row shows the tool name, a short summary of its arguments, and a status: `input-streaming` shows pending, `input-available` running, `output-available` done, `output-error` error.
+    - Once the input is complete, a row expands to its arguments as JSON and its result. A result that is a single string, such as `read_file`'s `{content}`, shows as plain text; on error the row shows the error text instead.
+  - `components/ai/DeniedCall.tsx`: `{call: DeniedCall}`, our own row, since Astryx has no denied status.
+    - It shows a warning icon on the warning-muted tone (no border), the tool in monospace, what it targeted, an orange `Token` per reason ("Blocked: outside project", "Blocked: tool not allowed", "Denied by you"), and the policy message.
+    - An error row is a plain row with a red error icon, so the two can't be confused. The dev page puts both side by side.
+  - `components/ai/summarize.ts` and `summarize.test.ts`: the argument summary; it prefers path, command, query or pattern, else the first string, and truncates at 60 characters. `bun test`: 2 pass.
+  - Checked in the browser: there are 3 expandable rows (input-streaming has no detail); clicking expanded two, giving `aria-expanded` `false,true,true`. The keyboard focus ring shows on the running row. No computed borders in the expanded detail. No console errors.
+  - Screenshots, checked by eye: `.screenshots/ai-05-tools-light.png` and `.screenshots/ai-05-tools-dark.png`, showing all 4 tool states (done and error expanded), all 3 denial reasons, and an error row for contrast.
+  - `bun run typecheck`: exit 0 on two clean runs. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
+  - Astryx note: `ChatToolCalls` rows are `div role="button"` with key handling, not `<button>`. They are keyboard-usable and expose `aria-expanded`.
 - [ ] Approval card.
 - [ ] Verify result and diff view.
 - [ ] Checkpoint with restore confirm.
@@ -94,3 +106,4 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
    - `Workspace.tsx` imports `MODELS` from `@/composer/models` (lines 27, 119, 183) and reads `m.value`. `lib/agent/models.ts` uses `{id, label, provider}`. Deleting `composer/models.ts` breaks typecheck in `Workspace.tsx`. Pointing only `ModelPicker` at the new list leaves the workspace's initial-model check on the old Claude/Gemini ids, so the picker and the sent model disagree.
    - `Workspace.tsx` renders its own Stop `Button` and does not pass `isStreaming={isBusy}` / `onStop={stop}` to `Composer`. The composer's built-in stop and disabled state therefore can't be re-checked against the live workspace until those props are passed.
    Proposal: AI-CORE makes two small changes in `Workspace.tsx`, (a) import `MODELS` from `@/lib/agent/models` and use `m.id`, and (b) pass `isStreaming={isBusy} onStop={stop}` to `Composer` and drop its separate Stop button. I then switch `ModelPicker`, `Composer` and `Message` to `lib/agent/models.ts` and delete `composer/models.ts` in the same change. Alternatively, let me make (a) and (b) in `Workspace.tsx` myself now. Which one?
+4. For the wire-up item, not blocking now: how will a policy-denied call reach the UI? AI-CORE's plan returns it to the model as a tool error. If it arrives as an ordinary `output-error` tool part, the chat can't tell it from a real error. A `DeniedCall` on the turn, or a data part, would let me render `DeniedCall` instead.
