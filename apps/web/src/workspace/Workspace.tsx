@@ -5,7 +5,7 @@ import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
 import {Button} from '@astryxdesign/core/Button';
-import {HStack} from '@astryxdesign/core/Layout';
+import {HStack, VStack} from '@astryxdesign/core/Layout';
 import {
   ChatMessage,
   ChatMessageBubble,
@@ -21,11 +21,11 @@ import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/lib/agent/models';
 import {createAgentChat, keepTurn, keyNotice, restoreCheckpoint, retry} from '@/lib/agent/client';
-import type {TurnEvent} from '@/lib/agent/types';
+import type {AgentMessage, TurnEvent} from '@/lib/agent/types';
 import {getCredential} from '@/lib/auth/client';
 import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
-import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
+import {PreviewToolbar, type PreviewTab} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
 import {changedFiles, startedBuilding, unshownApprovals} from '@/components/ai/turn';
 import {projectTitle, UNTITLED} from '@/components/ai/title';
@@ -123,6 +123,13 @@ const styles = stylex.create({
     minHeight: 0,
     display: 'flex',
   },
+  hidden: {
+    display: 'none',
+  },
+  settings: {
+    flexGrow: 1,
+    padding: spacingVars['--spacing-4'],
+  },
   frame: {
     flexGrow: 1,
     width: '100%',
@@ -141,6 +148,13 @@ const styles = stylex.create({
   },
 });
 
+// Latched, so a retry that drops the building turn never hides the preview again.
+function useHasBuilt(messages: AgentMessage[]) {
+  const [hasBuilt, setHasBuilt] = useState(false);
+  if (!hasBuilt && startedBuilding(messages)) setHasBuilt(true);
+  return hasBuilt;
+}
+
 type PreviewPaneProps = {
   preview: Preview;
   frameKey: number;
@@ -152,6 +166,10 @@ type PreviewPaneProps = {
 
 function PreviewPane({preview, frameKey, isLoading, onLoad, onRefresh, isHiddenWhenNarrow}: PreviewPaneProps) {
   const [hasPreview, setHasPreview] = useState(false);
+  // ChatGPT sign-in returns with ?chatgpt=<issue>, which the connection controls show.
+  const [tab, setTab] = useState<PreviewTab>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('chatgpt') ? 'settings' : 'preview',
+  );
   return (
     <section
       aria-label="Preview"
@@ -162,8 +180,10 @@ function PreviewPane({preview, frameKey, isLoading, onLoad, onRefresh, isHiddenW
         status={preview.error ? 'error' : isLoading || !hasPreview ? 'loading' : 'ready'}
         message={preview.error}
         onRefresh={onRefresh}
+        tab={tab}
+        onTabChange={setTab}
       />
-      <div {...stylex.props(styles.stage)}>
+      <div id="preview-panel" role="tabpanel" aria-label="Preview" {...stylex.props(styles.stage, tab !== 'preview' && styles.hidden)}>
         <iframe
           key={frameKey}
           title="App preview"
@@ -188,6 +208,12 @@ function PreviewPane({preview, frameKey, isLoading, onLoad, onRefresh, isHiddenW
             </div>
           )
         )}
+      </div>
+      <div id="settings-panel" role="tabpanel" aria-label="Settings" {...stylex.props(styles.settings, tab !== 'settings' && styles.hidden)}>
+        <VStack gap={2} align="start">
+          <Text weight="semibold">Models</Text>
+          <AuthControls />
+        </VStack>
       </div>
     </section>
   );
@@ -222,9 +248,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
-  // Latched, so a retry that drops the building turn never hides the preview again.
-  const [hasBuilt, setHasBuilt] = useState(false);
-  if (!hasBuilt && startedBuilding(messages)) setHasBuilt(true);
+  const hasBuilt = useHasBuilt(messages);
 
   // A send waits for its provider's key: the text stays in the composer and no request goes out.
   const [held, setHeld] = useState<{text: string; notice: string}>();
@@ -343,7 +367,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
           endContent={
             <HStack gap={2} align="center">
               <ModelPicker value={model} onChange={setModel} />
-              <AuthControls />
+              {!hasBuilt && <AuthControls />}
             </HStack>
           }
         />
