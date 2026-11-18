@@ -22,7 +22,7 @@ function RefreshGlyph(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export type PreviewTab = 'preview' | 'settings';
+export type PreviewTab = 'preview' | 'code' | 'settings';
 
 type PreviewToolbarProps = {
   url: string;
@@ -42,6 +42,7 @@ export function PreviewToolbar({url, status, message, onRefresh, tab = 'preview'
       startContent={
         <TabList role="tablist" value={tab} onChange={next => onTabChange?.(next as PreviewTab)}>
           <Tab value="preview" label="Preview" panelId="preview-panel" />
+          <Tab value="code" label="Code" panelId="code-panel" />
           <Tab value="settings" label="Settings" panelId="settings-panel" />
         </TabList>
       }
