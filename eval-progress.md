@@ -8,7 +8,7 @@ Current worker: CODEX-EVALS on `evals-baseline`, from `393d3696`. The current in
 
 Completed fixes: `ed0c8894` isolates every test-project Git call from inherited Git repository/worktree/index variables; `b3629eb0` adds `--task <id>`. Both include regression tests that failed before the fix, passed in two separate verification runs with typecheck, and passed again from committed HEAD.
 
-**Current blocker:** Vercel's starter base `betterlook-starter-1eeff41a8ee2` is stopped and has no snapshot. Existing `createProject()` cannot resume it: `APIError`, HTTP 400, `Cannot resume sandbox: no snapshot available`. Read-only API inspection confirms `snapshots: []` and **8,895 ms active CPU** on that failed base setup. There is no evidence of quota pause. Permission to delete only this failed external sandbox was requested; no deletion was performed. The founder's “Nothing outside this repository gets created, changed or deleted without my yes” rule requires that approval before reset. No GitHub write occurred.
+**Current blocker (see item 9 follow-up for read-only investigation and commit `8d27304d`):** Vercel's starter base `betterlook-starter-1eeff41a8ee2` is stopped and has no snapshot. Existing `createProject()` cannot resume it: `APIError`, HTTP 400, `Cannot resume sandbox: no snapshot available`. Read-only API inspection confirms `snapshots: []` and **8,895 ms active CPU** on that failed base setup. There is no evidence of quota pause. Permission to delete only this failed external sandbox was requested; no deletion was performed. The founder's “Nothing outside this repository gets created, changed or deleted without my yes” rule requires that approval before reset. No GitHub write occurred.
 
 Both requested model IDs are confirmed exactly by the provider models API (HTTP 200): `claude-haiku-5-5`, `claude-sonnet-5-5`. Langfuse project authentication works. All required key names are present; `OPENAI_EVAL_API_KEY` is absent. No key values were printed. Full unit suite and typecheck pass twice (183 tests).
 
@@ -413,6 +413,58 @@ node --env-file=apps/web/.env apps/web/node_modules/.cache/eval-inspect.mjs
   base_active_cpu_ms=8895
 ```
 No smoke run completed, no Langfuse dataset/experiment/queue link exists from this attempt, and no E4f evidence, task CPU, 84-run projection or quota-risk estimate exists. The failed setup CPU is reported separately. Item 9 is not ticked.
+
+### Item 9 follow-up: read-only investigation and setup diagnostics
+
+The orchestrator requests root-cause investigation before any reset, sandbox regression tests and hardening, then a stop. **No Vercel resource was created, resumed, modified or deleted in this follow-up.** Every external request was GET without `resume=true`. No model or benchmark ran.
+
+Read-only evidence:
+```
+node --env-file=apps/web/.env .scratch/evals/inspect-setup.mjs
+  GET base: HTTP 200, status=stopped, duration=35382ms, activeCpuDurationMs=8895
+node --env-file=apps/web/.env .scratch/evals/inspect-commands.mjs
+  GET session: HTTP 200
+  GET session/cmd: HTTP 200
+    tar -xzf <temporary archive> --directory / : exitCode=0
+    npm install --no-audit --no-fund          : exitCode=0
+    no git, checker or snapshot command appears
+node --env-file=apps/web/.env .scratch/evals/inspect-command-result.mjs
+  GET npm command: HTTP 200, exitCode=0, durationMs=8989
+```
+Npm started 830 ms after the session started. The stop request came 25,036 ms after npm finished. This localizes the original exception to returning from the first `sandbox.runCommand({cmd: 'npm', args: ['install', '--no-audit', '--no-fund']})` or submitting the next Git command; it does **not** prove which operation threw. The new starter upload succeeded. Checker setup had not begun.
+
+The original attempt's recorder saved only `error_class: TypeError`; its message, stack and cause were not retained. Its output file was subsequently overwritten by attempt 2. The exact original throw site and triggering input therefore **remain unproven**. Do not describe a network fault, SDK defect or starter-content defect as the root cause. The change below improves diagnostics and the known stuck-base behavior; it does not claim to fix that unknown original cause.
+
+Local SDK input checks (no external requests):
+```
+bun build .scratch/evals/reproduce-setup.ts --target=node --packages=external --outfile=.scratch/evals/reproduce-setup.mjs
+node .scratch/evals/reproduce-setup.mjs
+  starter: PASS; checker: PASS
+node .scratch/evals/offline-command.mjs
+  0
+```
+The first passes every unchanged starter string and the checker source through the installed SDK's actual FileWriter; the second runs its actual Session/APIClient command parser against an in-memory chunked successful npm response. Neither reproduces TypeError. These are local input checks, not proof of a successful Vercel setup. Reading the stopped command's logs returns HTTP 410 `sandbox_stopped`, without resuming it; no original transport exception is available there.
+
+Commit `8d27304d` (`fix(sandbox): identify setup failures and unusable bases`):
+- Setup command exceptions now name the sandbox, command and error class, retaining the original exception as `cause`, without copying arbitrary error content or all command arguments into the message.
+- The observed `Cannot resume sandbox: no snapshot available` error now names `BASE_NAME` and explicitly requires a reset. It preserves its cause, performs no automatic reset, and leaves unrelated errors unchanged.
+- A public `createProject` test injects a **synthetic** TypeError to prove diagnostic context and cause preservation, cleanup, and absence of a snapshot/child sandbox. This is not a reproduction of the unknown original TypeError.
+- A second test reproduces the observed HTTP 400 no-snapshot error, checks two attempts name the base without uploads or child creation, then proves the failed memo does not prevent success after simulated external recovery.
+
+```
+bun --no-env-file test apps/web/src/lib/sandbox/sandbox.test.ts
+  RED: 13 pass, 2 fail — raw errors lack command/base context
+  GREEN run 1: 15 pass, 0 fail; bun --no-env-file run typecheck → clean
+  GREEN run 2: 15 pass, 0 fail; bun --no-env-file run typecheck → clean
+bun --no-env-file test && bun --no-env-file run typecheck
+  run 1: 185 pass, 0 fail, 737 expect() calls; tsc --noEmit clean
+  run 2: 185 pass, 0 fail, 737 expect() calls; tsc --noEmit clean
+bun --no-env-file test apps/web/src/lib/sandbox/sandbox.test.ts
+  committed HEAD 8d27304d: 15 pass, 0 fail
+node .scratch/evals/security-scan.mjs
+  files_scanned=28 env_values_checked=12 env_matches=0 canary_matches=0 result=PASS
+```
+Stopped as instructed after the code/test commit and this evidence record. Item 9 stays unchecked. No reset or live createProject reproduction occurs before the orchestrator sends the founder's approval and instructs continuation; an approved retry must capture the full sanitized exception chain if setup fails again. The original exact throw/input cannot be recovered from the evidence retained so far.
 
 ## Item 10: Haiku (NOT_EVALUATED)
 
