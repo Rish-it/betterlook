@@ -1,0 +1,26 @@
+apps/web/src/components/ai/CodeView.tsx
+  s_cb38c57f4b26e2::t_ff2f2344da47a5 1-42,44-75
+  s_cb38c57f4b26e2::t_c3ae9a1c09114b 43
+apps/web/src/components/ai/PreviewToolbar.tsx
+  s_cb38c57f4b26e2::t_ff2f2344da47a5 25,45
+apps/web/src/workspace/Workspace.tsx
+  s_cb38c57f4b26e2::t_ff2f2344da47a5 31,101-104,219-223,348,402
+  s_cb38c57f4b26e2::t_1f60ac2afe0890 262-263,326,349-351,451
+  s_cb38c57f4b26e2::t_c3ae9a1c09114b 4,175,178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7ab5596e462e3f53b8ff38ca6b37dd371a700fce",
+  "prompts": {},
+  "sessions": {
+    "s_cb38c57f4b26e2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f04f-5eb6-7ec3-a700-690b78f77aff",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Rishit Sharma <rishitsharmar89@gmail.com>"
+    }
+  }
+}
