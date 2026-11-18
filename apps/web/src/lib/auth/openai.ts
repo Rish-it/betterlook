@@ -25,7 +25,7 @@ type SessionTokens = {
   expiresAt: number;
   refreshToken?: string;
   refreshAfter?: number;
-  scopes: string[];
+  scopes: Set<string>;
 };
 
 export type OpenAISession = {
@@ -177,9 +177,9 @@ export function createOpenAIClient(config: OpenAIConfig, fetcher: typeof fetch, 
 
   function tokenFields(data: Record<string, unknown>, previous?: SessionTokens): SessionTokens | null {
     const scopes = typeof data.scope === 'string'
-      ? data.scope.split(/\s+/)
-      : previous?.scopes ?? [];
-    if (!requiredScopes.every(scope => scopes.includes(scope))) return null;
+      ? new Set(data.scope.split(/\s+/))
+      : previous?.scopes ?? new Set<string>();
+    if (!requiredScopes.every(scope => scopes.has(scope))) return null;
 
     const {access_token, token_type, expires_in, refresh_token, earliest_refresh_at} = data;
     if (
