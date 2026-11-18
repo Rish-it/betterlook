@@ -1,0 +1,9 @@
+{
+  "name": "betterlook",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "bun --cwd apps/web dev",
+    "typecheck": "bun --cwd apps/web typecheck"
+  }
+}
