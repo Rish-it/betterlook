@@ -1,0 +1,19 @@
+apps/web/src/workspace/Workspace.tsx
+  s_cb38c57f4b26e2::t_60c60ddb73e0b4 9,71-77,389-395,397-398
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2d86230c8f3d13dc92a91106703ceaee0bbe4ff0",
+  "prompts": {},
+  "sessions": {
+    "s_cb38c57f4b26e2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f04f-5eb6-7ec3-a700-690b78f77aff",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Rishit Sharma <rishitsharmar89@gmail.com>"
+    }
+  }
+}
