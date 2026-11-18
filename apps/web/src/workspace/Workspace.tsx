@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
@@ -18,7 +18,7 @@ import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/token
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/lib/agent/models';
-import {createAgentChat, keepTurn, restoreCheckpoint} from '@/lib/agent/client';
+import {createAgentChat, keepTurn, keyNotice, restoreCheckpoint} from '@/lib/agent/client';
 import type {TurnEvent} from '@/lib/agent/types';
 import {getCredential} from '@/lib/auth/client';
 import {AuthControls} from '@/components/auth/AuthControls';
@@ -147,9 +147,18 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   // A server-rendered iframe can finish loading before hydration and its onLoad is lost.
   const isHydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
+  // A send waits for its provider's key: the text stays in the composer and no request goes out.
+  const [held, setHeld] = useState<{text: string; notice: string}>();
+  const deliver = useCallback(
+    async (text: string, sentModel: string) => {
+      const notice = await keyNotice(sentModel, getCredential);
+      setHeld(notice ? {text, notice} : undefined);
+      if (!notice) void sendMessage({text, metadata: {model: sentModel}}, {body: {model: sentModel}});
+    },
+    [sendMessage],
+  );
   const send = (text: string, sentModel: string) => {
-    if (isBusy) return;
-    sendMessage({text, metadata: {model: sentModel}}, {body: {model: sentModel}});
+    if (!isBusy) void deliver(text, sentModel);
   };
 
   const started = useRef(false);
@@ -180,9 +189,9 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     sandboxRequest.then(() => {
       if (firstSendCancelled.current) return;
       setIsConnecting(false);
-      sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+      void deliver(prompt, initialModelValue);
     });
-  }, [prompt, initialModelValue, sendMessage, setMessages]);
+  }, [prompt, initialModelValue, deliver, setMessages]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -276,6 +285,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                   onModelChange={setModel}
                   isStreaming={isBusy}
                   onStop={stopTurn}
+                  held={held}
                 />
               }>
               {(isConnecting || status === 'submitted') && (
