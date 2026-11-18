@@ -211,6 +211,23 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
   - Secret grep over logs, `apps/web/src` and `apps/web/scripts`: the only hit is the fake masking fixture in `trace.test.ts`. No `.env`.
   - LIVE PROOF PENDING ENV: with a real key and sandbox, trigger each case in the wired UI (a revoked or low-limit key for 429, a stopped sandbox, `/etc/passwd`, a deliberately broken edit, a long task) and confirm the notice shows and the next message works.
 
+## C11 Anthropic
+
+- [x] Anthropic as second provider, Claude Sonnet 5.5 default.
+  - `@ai-sdk/anthropic` 4.0.106, exact pin. It is the release on the same `@ai-sdk/provider` 4.0.39 and `provider-utils` 5.0.82 as `ai` 7.0.176 and `@ai-sdk/openai` 4.0.121.
+  - `models.ts`: `claude-sonnet-5-5` is `MODELS[0]`, OpenAI entries after it. `providerOf` moved here (client-safe) and is re-exported from `model.ts`.
+  - `model.ts`: `languageModel` uses `createAnthropic` for provider `anthropic` (API keys only), `createOpenAI` otherwise. `parseCredential` accepts `api-key` for `openai` and `anthropic`; OAuth in the body is still rejected.
+  - `/api/chat`: a body credential counts only if its provider matches the model's; the server OAuth credential is used only for OpenAI models. Missing key: "Add an Anthropic API key to use Claude Sonnet 5.5." (OpenAI: "Sign in or add an OpenAI API key to use GPT-5.").
+  - `run.ts`: provider options are per provider: `openai: {store: false, promptCacheKey}`, `anthropic: {fallbacks: 'default'}`. No temperature, topP, topK, forced toolChoice or thinking config is sent. The repair turn resends the first call's response messages unchanged, reasoning parts included (`toUIMessageStream` sends reasoning by default, so earlier turns come back with their thinking blocks too).
+  - Server-side fallbacks: `@ai-sdk/anthropic` 4.0.106 exposes `providerOptions.anthropic.fallbacks: 'default'` and adds the `server-side-fallback-2026-07-01` beta header itself, so it is on. Checked by capturing the real provider's request through a fake `fetch`: body `{"model":"claude-sonnet-5-5","max_tokens":…,"fallbacks":"default","stream":true}`, header `anthropic-beta: server-side-fallback-2026-07-01`.
+  - Refusal: finish reason `content-filter` (Anthropic `stop_reason: refusal`, after fallbacks also refused) ends the turn as `error` with notice "The model declined this request. Rephrase it or pick another model." No checkpoint or verify runs. Test in `failure.test.ts`.
+  - Errors: 401/403 map to the key message, 429 to the rate-limit message, 529 overloaded and other 5xx to the provider message; provider text is never forwarded. Tests in `errors.test.ts`.
+  - Secrets: `maskSecrets` already catches `sk-ant-…` through the `sk-` pattern; a test with a made-up `sk-ant-api03-fake…` string now covers it.
+  - Runner: `evalCredential(provider, env)` reads `OPENAI_EVAL_API_KEY` or `ANTHROPIC_EVAL_API_KEY` only, by the `--model` provider; `--model` defaults to `MODELS[0]` (now Claude Sonnet 5.5). `.env.example` has `ANTHROPIC_EVAL_API_KEY` with the separate-workspace note.
+  - Checks: `bun run typecheck` and `bun test` (71 pass, 0 fail) in two separate runs.
+  - LIVE PROOF PENDING ENV: `ANTHROPIC_EVAL_API_KEY` and Vercel credentials were not in `apps/web/.env` when this finished (checked for presence only). With them: `bun run agent:run --tasks .scratch/<one-task>.json --runs 1` and report pass/fail.
+  - Follow-ups, not built (no observed failure drives them): effort tuning for Claude Sonnet 5.5, Anthropic prompt caching (`cache_control`).
+
 ## types.ts changes
 
 - v1 (Plan item): `ProviderCredential` (`api-key` | `oauth` with `accessToken`), `ProviderId`, `ToolName`, `DeniedCall`, `ToolCallRecord`, `VerifyCheck`, `VerifyResult`, `Checkpoint`, `Usage`, `TurnStatus`, `TurnRecord`, `TurnEvent` (restore, keep, approve, deny). AUTH: an OAuth token goes in `{kind: 'oauth', accessToken}`; `ProviderId` widens when a second provider lands.
@@ -273,6 +290,8 @@ Original questions:
 4. **Eval key and Langfuse:** for later items I need, in `.env` (never shown to me in chat): `ANTHROPIC_EVAL_API_KEY` (or the OpenAI equivalent), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`.
 5. **System prompt slot:** this will be `apps/web/src/lib/agent/system-prompt.ts`, a one-line placeholder for you to fill in. It lands with the Agent core item.
 
+- C11 Anthropic: `lib/agent/client.ts` `createAgentChat({getCredential})` now takes `getCredential: (provider: ProviderId) => ProviderCredential | null`, called with the provider of the model in the request body. A zero-arg `getCredential` still type-checks. `providerOf(modelId)` is exported from client-safe `models.ts`. New exports in `errors.ts`: `REFUSED`, `missingKey({provider, label})`. `evalCredential` now takes `(provider, env)`. `types.ts` unchanged.
+
 ## Pending e2e
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
@@ -285,4 +304,5 @@ Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langf
 - Sandbox: real Vercel sandbox from the landing prompt, the preview shows the starter, a reload reconnects to the same sandbox, and a stopped sandbox resumes with the dev server restarted.
 - Tracing: a Langfuse trace per turn with nested model spans, hashes in metadata, record as output, cost computed; hash changes after a prompt edit; exported trace JSON has no `.env` value.
 - BYOK: valid key streams; missing key and revoked key show the two messages (needs AUTH's `getCredential()` and a real key).
+- Anthropic: one `agent:run` turn on `claude-sonnet-5-5` with `ANTHROPIC_EVAL_API_KEY` (pass/fail only); a refusal shows its notice in the wired UI.
 - Agent core: streamed reply from a real OpenAI model at `/workspace?model=gpt-5`; Stop aborts the server request.
