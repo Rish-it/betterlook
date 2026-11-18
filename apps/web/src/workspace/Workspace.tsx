@@ -28,12 +28,13 @@ import {Conversation} from '@/components/ai/Conversation';
 import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
 import {changedFiles, startedBuilding, unshownApprovals} from '@/components/ai/turn';
+import {projectTitle, UNTITLED} from '@/components/ai/title';
 
-const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
 const SANDBOX_KEY = 'betterlook.sandboxId';
 const APPROVAL_UNSHOWN = 'The approval could not be shown, so it was denied.';
 const CHAT_KEY = 'betterlook.chat';
+const TITLE_KEY = 'betterlook.title';
 const NARROW = '@media (max-width: 640px)';
 
 const readStored = (key: string) => {
@@ -217,6 +218,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   // The first prompt waits for the sandbox, so its request carries the sandbox id.
   const [isConnecting, setIsConnecting] = useState(false);
   const isBusy = isConnecting || status === 'submitted' || status === 'streaming';
+  const [title, setTitle] = useState('');
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
@@ -262,8 +264,12 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     }
     if (saved) {
       setMessages(JSON.parse(saved));
+      setTitle(readStored(TITLE_KEY) ?? UNTITLED);
       return;
     }
+    const firstTitle = projectTitle(prompt);
+    setTitle(firstTitle);
+    localStorage.setItem(TITLE_KEY, firstTitle);
     setIsConnecting(true);
     sandboxRequest ??= requestSandbox();
     // A failed sandbox still sends, so the chat shows the server's readable message.
@@ -333,7 +339,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
       topNav={
         <TopNav
           label="Workspace"
-          heading={PROJECT_NAME}
+          heading={title}
           endContent={
             <HStack gap={2} align="center">
               <ModelPicker value={model} onChange={setModel} />
