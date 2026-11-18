@@ -204,6 +204,9 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
 Answered 2026-11-18 (see Plan). Open:
 
+- **Headless runner (blocked, needs the founder):** please give the two-task sample file for `agent:run`, and confirm its format. My default is JSON: `[{"id": "hero-blue", "prompt": "..."}]`, with any extra fields the founder's judges need passed through untouched into each run folder. I won't write task content. The live runner will also need `OPENAI_EVAL_API_KEY` (a key separate from users', so it doesn't share their rate-limit budget) plus the Vercel credentials in `apps/web/.env`.
+- **Runner runtime note:** `@vercel/sandbox` does not load under Bun, so `bun run agent:run` will run the script under Node (`bun run` → `node --experimental-strip-types`), or through a small Node bundle if Node's type stripping cannot resolve the extensionless imports. I'll pick at build time.
+
 - Resolved: the picker default moves to AI-UI importing `lib/agent/models.ts` (see types.ts changes). Until AI-UI wires it, `Workspace.tsx` still seeds from `composer/models.ts`, so a non-OpenAI pick shows "<model> is not connected yet."
 
 Original questions:
