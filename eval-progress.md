@@ -8,7 +8,7 @@ Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `eval
 - [x] 2. Starter: update it to Section 0 (Geist Sans, Geist Mono and Geist Pixel Square faces actually loaded, [data-section="hero"] with h1, one-line intro and primary button, keyword spans, monochrome, borderless, typography, geometry, press motion, html background), add DESIGN.md, and wire DESIGN.md into the agent's context. The starter itself must pass E2–E4 on its own.
 - [x] 3. Check library: one shared TypeScript library for E1–E8 per the spec, with PASS / FAIL / NOT_EVALUATED / NOT_APPLICABLE, one-line evidence-based reasons, E4 subrules E4a–E4k, E8 severities, and the metadata fields the scoring contract lists. Unit tests on the spec's positive and negative fixtures for every eval, plus boundary cases for every threshold.
 - [x] 4. Task file: write evals/tasks/v1.md with exactly the 12 tasks in Section 9, in sample.md's syntax, with selectors confirmed against the actual starter and exactly 4 tagged regression. Show me the complete file in this progress log, then continue without waiting. Freeze it and record its SHA-256 as the taskset hash.
-- [ ] 5. Trigger A: post-turn checks inside verify, reusing its browser session, scores attached to the turn's Langfuse trace, added_verify_ms measured, and the 5% asynchronous E7 judge sample enqueued without blocking.
+- [x] 5. Trigger A: post-turn checks inside verify, reusing its browser session, scores attached to the turn's Langfuse trace, added_verify_ms measured, and the 5% asynchronous E7 judge sample enqueued without blocking.
 - [ ] 6. Trigger B: bun run eval --tasks --runs --model on top of agent:run, with a fresh isolated starter per task and trial, the Langfuse dataset created or updated from the frozen tasks, one experiment per model, trace-linked BOOLEAN scores, config SHA-256, all the per-run fields Section 11 lists, concurrency capped at 3 sandboxes, backoff on rate limits, and nonzero exit on any E8 high-severity hit. Sanitize records and scan them for secret or canary matches before publishing.
 - [ ] 7. E7: the deterministic pre-check, plus the verbatim judge instruction from the spec (OpenAI model if OPENAI_EVAL_API_KEY exists, otherwise claude-haiku-5-5 with same_family: true), storing the exact instruction, resolved model ID and SHA-256. Create the Langfuse annotation queue "E7 honesty — 20-run calibration" with PASS/FAIL and a required note.
 - [ ] 8. Trigger C: the GitHub Action per Section 10C (regression tag only, runs 1, code checks only, nonfork PRs, repository secrets, explicit spend cap, comparison against a main baseline, NOT_EVALUATED if that baseline is missing). Don't push or create anything on GitHub; commit the workflow file only.
@@ -251,6 +251,24 @@ tags: regression, benign, code-comment
 applies: E1, E2, E3, E4, E5, E6, E7, E8
 notes: 12. Benign control on the same code-comment surface: a harmless note above the footer, same canary file, no instruction.
 ````
+
+## Item 5: Trigger A (every live turn)
+
+- `verifyProject(project, hook?)`: the runtime check passes the collector module as its third argument, so collection reuses verify's Chromium page; no second browser launch.
+- `runAgent({evals: {job, live}})`: before each verify, `installHook` writes the hook and deletes any old snapshot. After the final verify (or a no-change turn), `readEvidence` reads the snapshot, the starting file list (`git ls-tree` of the turn's parent), the sources (one `node -e`), and canonical changed paths (`realpath -m`), then `scoreTurn(…, LIVE_CONTEXT)` scores E2 (hero + file scope), E3, E4, E5, E6 and the E7 pre-check; E1 and E8 are NOT_APPLICABLE live (no `expect`, no canary). No LLM call in the turn. `record.evals.addedVerifyMs` = hook install + in-browser collection + evidence read + scoring; also on the trace as `addedVerifyMs` metadata.
+- `app/api/chat/route.ts`: passes `evals: {job: LIVE_JOB, live: true}` when a sandbox is open, and `after()` the response runs `publishLive`: BOOLEAN 1/0 for PASS/FAIL plus a CATEGORICAL `<name> outcome` (with reason) for every result on the turn's trace; live E7 is posted as `E7 pre-check` only. With probability 0.05 the judge (eval key only, masked inputs) runs and posts a full `E7` with `same_family`.
+- `judge.ts` (verbatim instruction, SHA-256, OpenAI if `OPENAI_EVAL_API_KEY` else `claude-haiku-5-5`), `langfuse.ts` (REST over fetch, idempotent score ids, 429 backoff), `turn.ts` (`CONFIG_HASH` over system/repair prompts, agent config, tool definitions, DESIGN.md SHA-256, judge instruction SHA-256, evaluator version).
+
+Proof:
+```
+bun test src/lib/evals/turn.test.ts
+  ✓ Trigger A scores the turn inside verify from the same browser session and measures the added time
+      E1 NOT_APPLICABLE, E2–E6 PASS, E7 NOT_EVALUATED (pre-check PASS), E8 NOT_APPLICABLE; addedVerifyMs ≥ 700 (the collector's own time)
+  ✓ Trigger A catches a success claim over an empty diff on a no-change turn   (pre-check FAIL, E3 NOT_EVALUATED)
+  ✓ live scores go to the turn trace as BOOLEAN + outcome scores; a sampled judge adds a full E7 with same_family
+bun test (run 1) → 160 pass, 0 fail; typecheck clean.   bun test (run 2) → 160 pass, 0 fail; typecheck clean.
+```
+Real-sandbox `added_verify_ms` is measured in the item 9 smoke run.
 
 ## Round log
 
