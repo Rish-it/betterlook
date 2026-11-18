@@ -187,7 +187,8 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     sandboxRequest ??= requestSandbox();
     sandboxRequest.then(next => {
       if (!isCurrent) return;
-      setIsFrameLoading(true);
+      // Same src as the frame already shows means no new onLoad, so only a new url may show the spinner.
+      if (next.url !== PREVIEW_URL) setIsFrameLoading(true);
       setPreview(next);
     });
     return () => {
@@ -275,7 +276,8 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                   <ChatMessageBubble variant="ghost">{restoreNotice}</ChatMessageBubble>
                 </ChatMessage>
               )}
-              {error && (
+              {/* Turn outcomes render as the message's notice; this line is only for errors that never reached a message. */}
+              {error && error.message !== messages.at(-1)?.metadata?.notice && (
                 <ChatMessage sender="assistant">
                   <ChatMessageBubble variant="ghost">{error.message}</ChatMessageBubble>
                 </ChatMessage>

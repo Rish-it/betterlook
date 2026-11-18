@@ -236,3 +236,23 @@ export const liveTurn: AgentMessage[] = [
     ],
   },
 ];
+
+export const multilineUser: AgentMessage = {
+  id: 'msg_user_multiline',
+  role: 'user',
+  parts: [{type: 'text', text: 'Make the nav sticky\nand keep the logo on the left'}],
+};
+
+const noticeMessage = (id: string, status: 'failed' | 'error' | 'passed', notice: string): AgentMessage => ({
+  id,
+  role: 'assistant',
+  metadata: {model: fixtureModel, turnId: `turn_${id}`, status, notice},
+  parts: [{type: 'text', state: 'done', text: 'I changed the nav and ran the checks.'}],
+});
+
+// Notice texts mirror AI-CORE's lib/agent/errors.ts messages.
+export const noticeMessages: AgentMessage[] = [
+  noticeMessage('notice_verify', 'failed', 'The change still fails its checks after one repair attempt. Restore the previous version or describe what to fix.'),
+  noticeMessage('notice_steps', 'passed', 'The agent hit its step limit before finishing. Send another message to let it continue.'),
+  noticeMessage('notice_error', 'error', 'The preview sandbox stopped responding. Reload to try again.'),
+];

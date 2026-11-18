@@ -23,6 +23,7 @@ type MessageProps = {
 
 const styles = stylex.create({
   reasoning: {whiteSpace: 'pre-wrap'},
+  userText: {whiteSpace: 'pre-wrap'},
 });
 
 const isToolPart = (part: Part): part is ToolPart => part.type === 'dynamic-tool' || part.type.startsWith('tool-');
@@ -55,7 +56,9 @@ export function Message({message, onApproval, onEvent}: MessageProps) {
     const text = message.parts.flatMap(p => (p.type === 'text' ? [p.text] : [])).join('\n');
     return (
       <ChatMessage sender="user">
-        <ChatMessageBubble variant="filled">{text}</ChatMessageBubble>
+        <ChatMessageBubble variant="filled" xstyle={styles.userText}>
+          {text}
+        </ChatMessageBubble>
       </ChatMessage>
     );
   }
@@ -111,6 +114,11 @@ export function Message({message, onApproval, onEvent}: MessageProps) {
         if (part.type === 'data-diff') return <DiffView key={part.id ?? 'diff'} diff={part.data.diff} />;
         return null;
       })}
+      {message.metadata?.notice && (
+        <Text type="supporting" color="secondary" display="block">
+          {message.metadata.notice}
+        </Text>
+      )}
       {checkpoint && onEvent && <Checkpoint checkpoint={checkpoint} onEvent={onEvent} />}
     </ChatMessage>
   );
