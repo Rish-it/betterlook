@@ -46,6 +46,13 @@ export function noticeFor(record: TurnRecord): string | undefined {
   return undefined;
 }
 
+// DESIGN.md from the project root, sent every turn right after the cached prefix (tools and system). Data only, no instructions.
+export const PROJECT_CONTEXT_FILE = 'DESIGN.md';
+export const projectContextMessage = (content: string): ModelMessage => ({
+  role: 'user',
+  content: `<project_file path="${PROJECT_CONTEXT_FILE}">\n${content}\n</project_file>`,
+});
+
 const lastUserText = (messages: ModelMessage[]) => {
   const content = messages.findLast(m => m.role === 'user')?.content;
   return typeof content === 'string' ? content : (content ?? []).map(p => (p.type === 'text' ? p.text : '')).join('');
@@ -139,6 +146,8 @@ export function runAgent({
     repairVerify: null,
     steps: [],
     lengthStops: 0,
+    projectContextHash: null,
+    finalMessage: null,
     stepLimitReached: false,
     status: 'running',
     checkpoint: null,
@@ -284,6 +293,7 @@ export function runAgent({
           if (outcome.type !== 'end') return {outcome, messages: callMessages};
           const {steps} = outcome.event;
           addUsage(record.usage, outcome.event.totalUsage);
+          record.finalMessage = outcome.event.text;
           record.steps.push(...steps.map(s => ({finishReason: s.finishReason, outputTokens: s.usage.outputTokens ?? 0})));
           record.lengthStops = record.steps.filter(s => s.finishReason === 'length').length;
           const last = steps.at(-1)!;
@@ -302,7 +312,9 @@ export function runAgent({
 
       try {
         approvalEvents(messages, record.id, record.traceId);
-        const first = await runModel(messages, true);
+        const design = project ? await project.read(`${project.root}/${PROJECT_CONTEXT_FILE}`).catch(() => null) : null;
+        if (design) record.projectContextHash = hashOf(design);
+        const first = await runModel(design ? [projectContextMessage(design), ...messages] : messages, true);
         const outcome = first.outcome;
         if (!settled(outcome) || outcome.type !== 'end') return;
         if (outcome.event.content.some(p => p.type === 'tool-approval-request' && !p.isAutomatic)) return end({status: 'awaiting-approval'});

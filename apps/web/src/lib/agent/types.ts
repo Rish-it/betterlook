@@ -83,6 +83,8 @@ export interface TurnRecord {
   repairVerify: VerifyResult | null;
   steps: {finishReason: FinishReason; outputTokens: number}[];
   lengthStops: number;
+  projectContextHash: string | null;
+  finalMessage: string | null;
   stepLimitReached: boolean;
   status: TurnStatus;
   error?: string;
