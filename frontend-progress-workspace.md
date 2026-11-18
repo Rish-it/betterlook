@@ -2,6 +2,10 @@
 
 Owner: FE-B. Files: `apps/web/src/app/workspace/`, `apps/web/src/workspace/`. Dev server port 3200.
 
+## Shared contract additions
+
+- Borderless look (founder, via orchestrator): no visible borders, outlines or divider lines on page, composer, top bar, chat column, message bubbles, preview pane or preview toolbar. Regions separate by spacing and subtle Astryx surface/background token tone, light and dark. Resizable divider shows no line at rest; handle only on hover, drag, keyboard focus. Keyboard focus rings stay visible. Drop borders via Astryx variants/props first, else StyleX through the component's style prop, never global CSS. Checked in every UI screenshot.
+
 ## Checklist
 
 - [x] Research: use the agent-reach skill to look at how v0, Lovable and Emergent lay out their chat + preview workspace. Write a short component map in this file: top bar, chat column, message list, pinned composer, preview pane and its toolbar, resizable divider, and the Astryx component for each. Flag anything Astryx doesn't cover.
