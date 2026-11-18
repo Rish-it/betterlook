@@ -44,4 +44,4 @@ Source of component list: `docs/specs/components/` in github.com/meta/astryx.
 
 ## Questions
 
-None.
+- Blocked on FE-A scaffold: `apps/web` and root `package.json` are not on `fe-workspace`. Waiting for the orchestrator to say when to run `git merge betterlook`.
