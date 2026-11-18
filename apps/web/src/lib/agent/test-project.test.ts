@@ -4,10 +4,10 @@ import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {tempProject} from './test-project';
 
-test('temporary projects ignore inherited git repository, worktree and index paths', () => {
+test('temporary projects ignore inherited git repository, worktree and index paths', async () => {
   const other = tempProject({'original.txt': 'untouched'});
   try {
-    execFileSync('git', ['config', 'user.name', 'original'], {cwd: other.root});
+    await other.project.run('git', ['config', 'user.name', 'original']);
     const config = join(other.root, '.git/config');
     const before = readFileSync(config, 'utf8');
     const index = readFileSync(join(other.root, '.git/index'));
