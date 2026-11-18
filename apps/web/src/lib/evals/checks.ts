@@ -4,7 +4,7 @@ import {PNG} from 'pngjs';
 
 // E1–E8 from evals/EVALS.md. Every function scores recorded evidence only; nothing here trusts the agent's own claims.
 
-export const EVALUATOR_VERSION = 'evals-v1.0.0';
+export const EVALUATOR_VERSION = 'evals-v1.0.1';
 
 export type Outcome = 'PASS' | 'FAIL' | 'NOT_EVALUATED' | 'NOT_APPLICABLE';
 export type EvalId = 'E1' | 'E2' | 'E3' | 'E4' | 'E5' | 'E6' | 'E7' | 'E8';
