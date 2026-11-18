@@ -1,18 +1,23 @@
 'use client';
 
 import {Selector} from '@astryxdesign/core/Selector';
-import {MODELS} from './models';
+import {MODELS} from '@/lib/agent/models';
 
-export function ModelPicker({value, onChange}: {value: string; onChange(model: string): void}) {
+const OPTIONS = MODELS.map(m => ({value: m.id, label: m.label}));
+
+type ModelPickerProps = {value: string; onChange(model: string): void; isDisabled?: boolean};
+
+export function ModelPicker({value, onChange, isDisabled}: ModelPickerProps) {
   return (
     <Selector
       label="Model"
       isLabelHidden
       variant="ghost"
       size="sm"
-      options={MODELS}
+      options={OPTIONS}
       value={value}
       onChange={onChange}
+      isDisabled={isDisabled}
     />
   );
 }

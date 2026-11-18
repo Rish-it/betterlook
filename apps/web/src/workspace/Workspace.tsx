@@ -1,31 +1,30 @@
 'use client';
 
-import {useEffect, useRef, useState, useSyncExternalStore, type SVGProps} from 'react';
-import {Chat, useChat} from '@ai-sdk/react';
-import {DefaultChatTransport, type UIMessage} from 'ai';
+import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
-import {Button} from '@astryxdesign/core/Button';
+import {HStack} from '@astryxdesign/core/Layout';
 import {
-  ChatLayout,
   ChatMessage,
   ChatMessageBubble,
-  ChatMessageList,
 } from '@astryxdesign/core/Chat';
-import {Icon} from '@astryxdesign/core/Icon';
-import {IconButton} from '@astryxdesign/core/IconButton';
 import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {percent, pixel} from '@astryxdesign/core/Resizable/utils';
 import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {Spinner} from '@astryxdesign/core/Spinner';
-import {Text} from '@astryxdesign/core/Text';
-import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {TopNav} from '@astryxdesign/core/TopNav';
 import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
-import {MODELS} from '@/composer/models';
-import type {ProviderCredential} from '@/lib/agent/types';
+import {MODELS} from '@/lib/agent/models';
+import {createAgentChat, keepTurn, restoreCheckpoint} from '@/lib/agent/client';
+import type {TurnEvent} from '@/lib/agent/types';
+import {getCredential} from '@/lib/auth/client';
+import {AuthControls} from '@/components/auth/AuthControls';
+import {Conversation} from '@/components/ai/Conversation';
+import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
+import {Thinking} from '@/components/ai/Thinking';
 
 const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
@@ -35,11 +34,6 @@ const NARROW = '@media (max-width: 640px)';
 
 const noopSubscribe = () => () => {};
 
-// Stub until AUTH's lib/auth/client.ts lands on betterlook; replace with its import.
-const getCredential = (): ProviderCredential | null => null;
-
-type AgentMessage = UIMessage<{model: string}>;
-const transport = new DefaultChatTransport<AgentMessage>({api: '/api/chat', body: () => ({credential: getCredential()})});
 
 const readStored = (key: string) => {
   try {
@@ -66,7 +60,6 @@ async function requestSandbox(): Promise<Preview> {
 // One request per page load, so StrictMode's double effect never starts two sandboxes.
 let sandboxRequest: Promise<Preview> | null = null;
 
-const textOf = (m: UIMessage) => m.parts.map(p => (p.type === 'text' ? p.text : '')).join('');
 type View = 'chat' | 'preview';
 
 const styles = stylex.create({
@@ -129,15 +122,6 @@ const styles = stylex.create({
   },
 });
 
-function RefreshGlyph(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-      <path d="M21 3v6h-6" />
-    </svg>
-  );
-}
-
 export function Workspace({prompt, model: initialModel}: {prompt: string; model: string}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const resizable = useResizable({
@@ -146,13 +130,15 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     maxSize: '70%',
     containerRef,
   });
-  const initialModelValue = MODELS.some(m => m.value === initialModel) ? initialModel : MODELS[0].value;
+  const initialModelValue = MODELS.some(m => m.id === initialModel) ? initialModel : MODELS[0].id;
   const [model, setModel] = useState(initialModelValue);
   // Owned here so StrictMode's simulated unmount cannot stop the first send.
-  const [chat] = useState(() => new Chat<AgentMessage>({transport}));
+  const [chat] = useState(() => createAgentChat({getCredential, getSandboxId: () => readStored(SANDBOX_KEY)}));
   const {messages, setMessages, sendMessage, status, stop, error} = useChat({chat});
   const [preview, setPreview] = useState<Preview>({url: PREVIEW_URL});
-  const isBusy = status === 'submitted' || status === 'streaming';
+  // The first prompt waits for the sandbox, so its request carries the sandbox id.
+  const [isConnecting, setIsConnecting] = useState(false);
+  const isBusy = isConnecting || status === 'submitted' || status === 'streaming';
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
@@ -165,6 +151,12 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   };
 
   const started = useRef(false);
+  const firstSendCancelled = useRef(false);
+  const stopTurn = () => {
+    firstSendCancelled.current = true;
+    setIsConnecting(false);
+    void stop();
+  };
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -176,8 +168,18 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
       sandboxRequest = null;
       window.history.replaceState(null, '', `/workspace?${new URLSearchParams({model: initialModelValue})}`);
     }
-    if (saved) setMessages(JSON.parse(saved));
-    else sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+    if (saved) {
+      setMessages(JSON.parse(saved));
+      return;
+    }
+    setIsConnecting(true);
+    sandboxRequest ??= requestSandbox();
+    // A failed sandbox still sends, so the chat shows the server's readable message.
+    sandboxRequest.then(() => {
+      if (firstSendCancelled.current) return;
+      setIsConnecting(false);
+      sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+    });
   }, [prompt, initialModelValue, sendMessage, setMessages]);
 
   useEffect(() => {
@@ -202,6 +204,24 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     setFrameKey(k => k + 1);
   };
 
+  const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
+  const onTurnEvent = async (event: TurnEvent) => {
+    const traceId = messages.find(m => m.metadata?.turnId === event.turnId)?.metadata?.traceId;
+    if (event.type === 'keep') {
+      await keepTurn({turnId: event.turnId, traceId});
+      return;
+    }
+    const sandboxId = readStored(SANDBOX_KEY);
+    if (event.type !== 'restore' || !sandboxId) return;
+    try {
+      await restoreCheckpoint({sandboxId, checkpointId: event.checkpointId, turnId: event.turnId, traceId});
+      setRestoreNotice('Restored. The preview shows the app as it was at that checkpoint.');
+      refresh();
+    } catch (e) {
+      setRestoreNotice(e instanceof Error && e.message ? e.message : 'That checkpoint could not be restored.');
+    }
+  };
+
   return (
     <AppShell
       height="fill"
@@ -211,7 +231,12 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
         <TopNav
           label="Workspace"
           heading={PROJECT_NAME}
-          endContent={<ModelPicker value={model} onChange={setModel} />}
+          endContent={
+            <HStack gap={2} align="center">
+              <ModelPicker value={model} onChange={setModel} />
+              <AuthControls />
+            </HStack>
+          }
         />
       }>
       <div {...stylex.props(styles.body)}>
@@ -225,38 +250,37 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
           <section
             aria-label="Chat"
             {...stylex.props(styles.chat(resizable.size), view !== 'chat' && styles.hiddenWhenNarrow)}>
-            <ChatLayout
+            <Conversation
+              messages={messages}
+              isStreaming={isBusy}
+              onApproval={(id, approved) => chat.addToolApprovalResponse({id, approved})}
+              onEvent={onTurnEvent}
               composer={
-                <Composer placeholder="Describe a change" onSubmit={send} model={model} onModelChange={setModel} />
+                <Composer
+                  placeholder="Describe a change"
+                  onSubmit={send}
+                  model={model}
+                  onModelChange={setModel}
+                  isStreaming={isBusy}
+                  onStop={stopTurn}
+                />
               }>
-              <ChatMessageList>
-                {messages.map(m => (
-                  <ChatMessage key={m.id} sender={m.role === 'user' ? 'user' : 'assistant'}>
-                    <ChatMessageBubble
-                      variant={m.role === 'user' ? 'filled' : 'ghost'}
-                      metadata={
-                        m.metadata?.model && (
-                          <Text type="supporting" color="secondary">
-                            {MODELS.find(x => x.value === m.metadata?.model)?.label}
-                          </Text>
-                        )
-                      }>
-                      {textOf(m)}
-                    </ChatMessageBubble>
-                  </ChatMessage>
-                ))}
-                {error && (
-                  <ChatMessage sender="assistant">
-                    <ChatMessageBubble variant="ghost">{error.message}</ChatMessageBubble>
-                  </ChatMessage>
-                )}
-                {isBusy && (
-                  <ChatMessage sender="assistant">
-                    <Button label="Stop" variant="secondary" size="sm" onClick={() => stop()} />
-                  </ChatMessage>
-                )}
-              </ChatMessageList>
-            </ChatLayout>
+              {(isConnecting || status === 'submitted') && (
+                <ChatMessage sender="assistant">
+                  <Thinking />
+                </ChatMessage>
+              )}
+              {restoreNotice && (
+                <ChatMessage sender="assistant">
+                  <ChatMessageBubble variant="ghost">{restoreNotice}</ChatMessageBubble>
+                </ChatMessage>
+              )}
+              {error && (
+                <ChatMessage sender="assistant">
+                  <ChatMessageBubble variant="ghost">{error.message}</ChatMessageBubble>
+                </ChatMessage>
+              )}
+            </Conversation>
           </section>
           <ResizeHandle
             direction="horizontal"
@@ -269,30 +293,11 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
             aria-label="Preview"
             aria-busy={isFrameLoading}
             {...stylex.props(styles.preview, view !== 'preview' && styles.previewHiddenWhenNarrow)}>
-            <Toolbar
-              label="Preview"
-              size="sm"
-              startContent={<Text type="supporting" color="secondary">{preview.error ?? 'Preview'}</Text>}
-              endContent={
-                <>
-                  <IconButton
-                    label="Refresh preview"
-                    variant="ghost"
-                    size="sm"
-                    icon={<Icon icon={RefreshGlyph} />}
-                    onClick={refresh}
-                  />
-                  <IconButton
-                    label="Open preview in new tab"
-                    variant="ghost"
-                    size="sm"
-                    icon={<Icon icon="externalLink" />}
-                    href={preview.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
-                </>
-              }
+            <PreviewToolbar
+              url={preview.url}
+              status={preview.error ? 'error' : isFrameLoading ? 'loading' : 'ready'}
+              message={preview.error}
+              onRefresh={refresh}
             />
             {isHydrated && (
               <iframe
