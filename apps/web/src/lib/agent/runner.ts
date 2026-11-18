@@ -35,6 +35,27 @@ export function parseTasks(value: unknown): Task[] {
   });
 }
 
+const STARTERS = ['default'];
+
+// The founder's Markdown task format: one "## <task id>" section per task with "prompt:", "starter:" and "notes:" lines.
+// Notes are for the founder and never reach the runner; anything before the first heading is ignored.
+export function parseTaskMarkdown(text: string): Task[] {
+  const sections = text.split(/^## +/m).slice(1);
+  if (!sections.length) throw new Error('The task file has no "## <task id>" sections.');
+  return parseTasks(
+    sections.map(section => {
+      const [heading, ...lines] = section.split('\n');
+      const id = heading.trim();
+      const field = (name: string) => lines.find(l => l.startsWith(`${name}:`))?.slice(name.length + 1).trim();
+      const prompt = field('prompt');
+      if (!prompt) throw new Error(`Task ${id} needs a prompt.`);
+      const starter = field('starter') || 'default';
+      if (!STARTERS.includes(starter)) throw new Error(`Task ${id} uses starter "${starter}"; available: ${STARTERS.join(', ')}.`);
+      return {id, prompt, starter};
+    }),
+  );
+}
+
 const EVAL_KEYS: Record<ProviderId, string> = {openai: 'OPENAI_EVAL_API_KEY', anthropic: 'ANTHROPIC_EVAL_API_KEY'};
 
 export function evalCredential(provider: ProviderId, env: Record<string, string | undefined>): ProviderCredential {

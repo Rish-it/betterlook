@@ -4,7 +4,7 @@ import {parseArgs} from 'node:util';
 import {RUNNER_CONFIG} from '../src/lib/agent/config';
 import {languageModel} from '../src/lib/agent/model';
 import {MODELS, providerOf} from '../src/lib/agent/models';
-import {evalCredential, parseTasks, previewScreenshot, runTasks} from '../src/lib/agent/runner';
+import {evalCredential, parseTaskMarkdown, parseTasks, previewScreenshot, runTasks} from '../src/lib/agent/runner';
 import {flushTraces} from '../src/lib/agent/trace';
 import {createProject, sandboxConfigured} from '../src/lib/sandbox/sandbox';
 
@@ -19,9 +19,10 @@ const {values} = parseArgs({
 });
 
 const cwd = process.env.INIT_CWD ?? process.cwd();
-if (!values.tasks) throw new Error('Usage: bun run agent:run --tasks <file.json> --runs <k> [--concurrency n] [--model id] [--out dir]');
+if (!values.tasks) throw new Error('Usage: bun run agent:run --tasks <file.md|file.json> --runs <k> [--concurrency n] [--model id] [--out dir]');
 if (!sandboxConfigured()) throw new Error('Set the Vercel sandbox credentials in apps/web/.env.');
-const tasks = parseTasks(JSON.parse(readFileSync(resolve(cwd, values.tasks), 'utf8')));
+const taskText = readFileSync(resolve(cwd, values.tasks), 'utf8');
+const tasks = values.tasks.endsWith('.md') ? parseTaskMarkdown(taskText) : parseTasks(JSON.parse(taskText));
 const provider = providerOf(values.model);
 if (!provider) throw new Error(`Unknown model ${values.model}. Pick one of: ${MODELS.map(m => m.id).join(', ')}.`);
 const credential = evalCredential(provider, process.env);

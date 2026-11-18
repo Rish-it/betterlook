@@ -8,7 +8,7 @@ import {MockLanguageModelV4} from 'ai/test';
 import type {Project} from '../sandbox/project';
 import {SANDBOX_QUOTA} from './errors';
 import {SYSTEM_PROMPT_HASH} from './run';
-import {evalCredential, parseTasks, previewScreenshot, runTasks, type Task} from './runner';
+import {evalCredential, parseTaskMarkdown, parseTasks, previewScreenshot, runTasks, type Task} from './runner';
 import {tempProject, textStep, toolStep} from './test-project';
 
 const cleanups: (() => void)[] = [];
@@ -58,6 +58,31 @@ test('task files are a JSON array of {id, prompt} and extra fields pass through 
   expect(() => parseTasks([{id: '../x', prompt: 'p'}])).toThrow('needs an id');
   expect(() => parseTasks([{id: 'a'}])).toThrow('needs a prompt');
   expect(() => parseTasks([{id: 'a', prompt: 'p'}, {id: 'a', prompt: 'q'}])).toThrow('used twice');
+});
+
+test('Markdown task files give one task per section; notes never reach the runner', () => {
+  const md = [
+    '# Sample tasks',
+    'Intro text the runner ignores.',
+    '',
+    '## hero-blue',
+    'prompt: make the hero heading blue',
+    'notes: checks colour only',
+    '',
+    '## cta-copy',
+    'prompt: change the button text to "Start now"',
+    'starter: default',
+    '',
+  ].join('\n');
+  expect(parseTaskMarkdown(md)).toEqual([
+    {id: 'hero-blue', prompt: 'make the hero heading blue', starter: 'default'},
+    {id: 'cta-copy', prompt: 'change the button text to "Start now"', starter: 'default'},
+  ]);
+  expect(() => parseTaskMarkdown('## a\nprompt: p\n## no-prompt\nnotes: forgot it\n')).toThrow('Task no-prompt needs a prompt.');
+  expect(() => parseTaskMarkdown('## a\nprompt:   \n')).toThrow('Task a needs a prompt.');
+  expect(() => parseTaskMarkdown('## a\nprompt: p\nstarter: shop\n')).toThrow('Task a uses starter "shop"; available: default.');
+  expect(() => parseTaskMarkdown('## a\nprompt: p\n## a\nprompt: q\n')).toThrow('Task id a is used twice.');
+  expect(() => parseTaskMarkdown('# only a title\n')).toThrow('no "## <task id>" sections');
 });
 
 test('the runner only ever uses the eval key', () => {
