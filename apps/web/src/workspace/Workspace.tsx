@@ -25,10 +25,12 @@ import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
 import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
+import {unshownApprovals} from '@/components/ai/turn';
 
 const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
 const SANDBOX_KEY = 'betterlook.sandboxId';
+const APPROVAL_UNSHOWN = 'The approval could not be shown, so it was denied.';
 const CHAT_KEY = 'betterlook.chat';
 const NARROW = '@media (max-width: 640px)';
 
@@ -195,6 +197,16 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
       isCurrent = false;
     };
   }, []);
+
+  // An approval the designer cannot see would wait forever, so it is denied with a reason the model reads.
+  const deniedApprovals = useRef(new Set<string>());
+  useEffect(() => {
+    for (const id of unshownApprovals(messages)) {
+      if (deniedApprovals.current.has(id)) continue;
+      deniedApprovals.current.add(id);
+      void chat.addToolApprovalResponse({id, approved: false, reason: APPROVAL_UNSHOWN});
+    }
+  }, [messages, chat]);
 
   useEffect(() => {
     if (messages.length > 0 && !isBusy) localStorage.setItem(CHAT_KEY, JSON.stringify(messages));

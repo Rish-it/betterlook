@@ -12,8 +12,7 @@ import {DeniedCall} from './DeniedCall';
 import {DiffView} from './DiffView';
 import {ToolCall, type ToolPart} from './ToolCall';
 import {VerifyResult} from './VerifyResult';
-
-type Part = AgentMessage['parts'][number];
+import {isToolPart} from './turn';
 
 type MessageProps = {
   message: AgentMessage;
@@ -25,8 +24,6 @@ const styles = stylex.create({
   reasoning: {whiteSpace: 'pre-wrap'},
   userText: {whiteSpace: 'pre-wrap'},
 });
-
-const isToolPart = (part: Part): part is ToolPart => part.type === 'dynamic-tool' || part.type.startsWith('tool-');
 
 function decisionOf(part: ToolPart): ApprovalDecision {
   if (part.state === 'approval-requested') return 'pending';
