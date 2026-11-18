@@ -22,7 +22,7 @@ import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
 import {createTools, proposedDiff, TOOL_DEFINITIONS} from './tools';
-import {hashOf, TRACER_NAME} from './trace';
+import {hashOf, maskSecrets, TRACER_NAME} from './trace';
 import type {AgentMessage, DeniedCall, ToolCallRecord, ToolName, TurnRecord, Usage, VerifyResult} from './types';
 import {verifyProject} from './verify';
 
@@ -191,6 +191,7 @@ export function runAgent({
             model,
             instructions: SYSTEM_PROMPT || undefined,
             messages: callMessages,
+            prepareStep: ({messages}) => ({messages: JSON.parse(maskSecrets(JSON.stringify(messages)))}),
             stopWhen: isStepCount(Math.max(1, AGENT_CONFIG.maxSteps - record.steps.length)),
             maxOutputTokens: AGENT_CONFIG.maxOutputTokens,
             // Claude Sonnet 5.5 400s on non-default sampling, forced toolChoice and disabled thinking, so none are set.
