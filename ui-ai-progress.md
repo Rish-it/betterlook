@@ -121,7 +121,18 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
     - `.screenshots/ai-07-verify-diff-light.png` and `.screenshots/ai-07-verify-diff-dark.png`: passed collapsed; typecheck, build and runtime failed expanded; diff collapsed and expanded
     - `.screenshots/ai-06-approval-{light,dark}.png`, re-shot
   - `bun run typecheck`: exit 0 on two clean runs. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
-- [ ] Checkpoint with restore confirm.
+- [x] Checkpoint with restore confirm.
+
+  - `components/ai/Checkpoint.tsx`: `{checkpoint: Checkpoint; onEvent(event: TurnEvent): void}`.
+    - The marker is a `ChatSystemMessage` (default variant, so no divider lines) reading "Checkpoint · <Timestamp>" with a ghost Restore `Button`.
+    - Restore opens an Astryx `AlertDialog`, "Restore this checkpoint?", with Cancel and a destructive Restore. Confirming emits `TurnEvent` `{type: 'restore', turnId, checkpointId, at}`; Cancel emits nothing.
+    - The dialog's `--shadow-high` drew a light ring in dark mode; it is dropped with `xstyle` (`boxShadow: 'none'`). Tone and the dimmed backdrop separate it now.
+  - Checked in the browser:
+    - the `alertdialog` opens; Cancel leaves the events empty and returns focus to Restore
+    - confirming emits `{"type":"restore","turnId":"turn_01","checkpointId":"cp_8f3a2c1",…}`
+    - no console errors
+  - Screenshots, checked by eye: `.screenshots/ai-08-checkpoint-{light,dark}-marker.png`, `-confirm.png` (dialog open) and `-restored.png` (event emitted).
+  - `bun run typecheck`: exit 0 on two clean runs; `bun test`: 4 pass. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
 - [ ] Thinking state and preview toolbar.
 - [ ] Wire-up: only once the AI loop has that data, swap mocks for live data in the chat panel and connect approve/deny/restore callbacks; list anything still on mocks.
 

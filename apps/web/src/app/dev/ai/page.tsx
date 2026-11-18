@@ -15,6 +15,7 @@ import {DeniedCall} from '@/components/ai/DeniedCall';
 import {ApprovalCard} from '@/components/ai/ApprovalCard';
 import {VerifyResult} from '@/components/ai/VerifyResult';
 import {DiffView} from '@/components/ai/DiffView';
+import {Checkpoint} from '@/components/ai/Checkpoint';
 import type {TurnEvent} from '@/lib/agent/types';
 import {Composer} from '@/composer/Composer';
 
@@ -97,6 +98,20 @@ function ApprovalStates() {
   );
 }
 
+function CheckpointStates() {
+  const [events, setEvents] = useState<TurnEvent[]>([]);
+  return (
+    <>
+      <State label="marker between turns; Restore opens a confirm step">
+        <Checkpoint checkpoint={f.checkpoint} onEvent={e => setEvents(list => [...list, e])} />
+      </State>
+      <State label="events emitted">
+        <Code language="json" code={JSON.stringify(events, null, 2)} />
+      </State>
+    </>
+  );
+}
+
 export default function AiDevPage() {
   if (process.env.NODE_ENV === 'production') notFound();
 
@@ -166,9 +181,7 @@ export default function AiDevPage() {
         </Section>
 
         <Section title="Checkpoint">
-          <State label="marker, then restore confirm">
-            <Fixture value={f.checkpoint} />
-          </State>
+          <CheckpointStates />
         </Section>
 
         <Section title="Thinking state">
