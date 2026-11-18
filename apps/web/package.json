@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "db:migrate": "node --env-file=.env ./node_modules/drizzle-kit/bin.cjs migrate",
-    "agent:run": "bun build scripts/agent-run.ts --target=node --packages=external --outfile=node_modules/.cache/agent-run.mjs && node --env-file-if-exists=.env node_modules/.cache/agent-run.mjs"
+    "agent:run": "bun build scripts/agent-run.ts --target=node --packages=external --outfile=node_modules/.cache/agent-run.mjs && node --env-file-if-exists=.env node_modules/.cache/agent-run.mjs",
+    "eval": "bun build scripts/eval.ts --target=node --packages=external --outfile=node_modules/.cache/eval.mjs && node --env-file-if-exists=.env node_modules/.cache/eval.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.106",
