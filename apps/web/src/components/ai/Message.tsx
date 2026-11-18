@@ -12,7 +12,7 @@ import {DeniedCall} from './DeniedCall';
 import {DiffView} from './DiffView';
 import {ToolCall, type ToolPart} from './ToolCall';
 import {VerifyResult} from './VerifyResult';
-import {hasThought, isToolPart} from './turn';
+import {cancelReason, hasThought, isToolPart, toolName} from './turn';
 
 type MessageProps = {
   message: AgentMessage;
@@ -91,6 +91,8 @@ export function Message({message, onApproval, onEvent}: MessageProps) {
         if (isToolPart(part)) {
           const deniedCall = denied.get(part.toolCallId);
           if (deniedCall) return <DeniedCall key={part.toolCallId} call={deniedCall} />;
+          const cancelled = cancelReason(part);
+          if (cancelled) return <DeniedCall key={part.toolCallId} call={{tool: toolName(part), args: part.input, reason: 'cancelled', message: cancelled}} />;
           const approval = approvals.get(part.toolCallId);
           const approvalId = part.approval?.id;
           if (approval && approvalId && part.state !== 'output-available' && part.state !== 'output-error')

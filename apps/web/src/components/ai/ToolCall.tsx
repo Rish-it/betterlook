@@ -4,6 +4,7 @@ import {VStack} from '@astryxdesign/core/Layout';
 import {Text} from '@astryxdesign/core/Text';
 import {Code} from './Code';
 import {summarizeArgs} from './summarize';
+import {toolName} from './turn';
 
 export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
@@ -16,8 +17,6 @@ const STATUS: Record<ToolPart['state'], ChatToolCallStatus> = {
   'output-error': 'error',
   'output-denied': 'error',
 };
-
-const toolName = (part: ToolPart) => (part.type === 'dynamic-tool' ? part.toolName : part.type.slice(5));
 
 // A single-string result such as {content: '...'} reads better as the string itself.
 const unwrap = (value: unknown) => {
@@ -50,7 +49,7 @@ export function ToolCall({part}: {part: ToolPart}) {
           errorMessage: part.state === 'output-error' ? part.errorText : undefined,
           resultDetail: hasInput ? (
             <VStack gap={2}>
-              <Detail label="Arguments" value={part.input} />
+              {part.input !== undefined && <Detail label="Arguments" value={part.input} />}
               {part.state === 'output-available' && <Detail label="Result" value={unwrap(part.output)} />}
               {part.state === 'output-error' && <Detail label="Error" value={part.errorText} />}
             </VStack>

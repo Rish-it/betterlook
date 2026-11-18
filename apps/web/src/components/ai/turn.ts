@@ -4,6 +4,8 @@ import type {ToolPart} from './ToolCall';
 
 type Part = AgentMessage['parts'][number];
 
+export const toolName = (part: ToolPart) => (part.type === 'dynamic-tool' ? part.toolName : part.type.slice(5));
+
 export const isToolPart = (part: Part): part is ToolPart => part.type === 'dynamic-tool' || part.type.startsWith('tool-');
 
 // The card needs the data-approval part's path and diff; without it there is nothing to approve.
@@ -20,3 +22,6 @@ export const uniqueById = (messages: AgentMessage[]) => [...new Map(messages.map
 export const changedFiles = (message: AgentMessage) => message.parts.some(p => p.type === 'data-diff' && p.data.diff !== '');
 
 export const hasThought = (part: ReasoningUIPart) => part.text.trim() !== '';
+
+// Every cancelled call's errorText starts with "Cancelled: " (lib/agent/errors.ts).
+export const cancelReason = (part: ToolPart) => (part.state === 'output-error' && part.errorText.startsWith('Cancelled: ') ? part.errorText : undefined);
