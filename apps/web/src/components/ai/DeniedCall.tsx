@@ -6,10 +6,13 @@ import {Token} from '@astryxdesign/core/Token';
 import {colorVars, radiusVars, spacingVars, typeScaleVars, typographyVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {summarizeArgs} from './summarize';
 
-const LABEL: Record<DeniedCallRecord['reason'], string> = {
+type Reason = DeniedCallRecord['reason'] | 'cancelled';
+
+const LABEL: Record<Reason, string> = {
   'outside-project': 'Blocked: outside project',
   'not-allowlisted': 'Blocked: tool not allowed',
   'user-denied': 'Denied by you',
+  cancelled: 'Cancelled',
 };
 
 const styles = stylex.create({
@@ -42,7 +45,7 @@ const styles = stylex.create({
   },
 });
 
-export function DeniedCall({call}: {call: DeniedCallRecord}) {
+export function DeniedCall({call}: {call: Pick<DeniedCallRecord, 'tool' | 'args' | 'message'> & {reason: Reason}}) {
   const target = summarizeArgs(call.args);
   return (
     <div {...stylex.props(styles.root)}>

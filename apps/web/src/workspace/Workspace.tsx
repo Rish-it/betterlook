@@ -1,9 +1,10 @@
 'use client';
 
-import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
+import {Button} from '@astryxdesign/core/Button';
 import {HStack} from '@astryxdesign/core/Layout';
 import {
   ChatMessage,
@@ -18,17 +19,19 @@ import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/token
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/lib/agent/models';
-import {createAgentChat, keepTurn, restoreCheckpoint} from '@/lib/agent/client';
+import {createAgentChat, keepTurn, keyNotice, restoreCheckpoint, retry} from '@/lib/agent/client';
 import type {TurnEvent} from '@/lib/agent/types';
 import {getCredential} from '@/lib/auth/client';
 import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
 import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
+import {changedFiles, unshownApprovals} from '@/components/ai/turn';
 
 const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
 const SANDBOX_KEY = 'betterlook.sandboxId';
+const APPROVAL_UNSHOWN = 'The approval could not be shown, so it was denied.';
 const CHAT_KEY = 'betterlook.chat';
 const NARROW = '@media (max-width: 640px)';
 
@@ -133,7 +136,15 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const initialModelValue = MODELS.some(m => m.id === initialModel) ? initialModel : MODELS[0].id;
   const [model, setModel] = useState(initialModelValue);
   // Owned here so StrictMode's simulated unmount cannot stop the first send.
-  const [chat] = useState(() => createAgentChat({getCredential, getSandboxId: () => readStored(SANDBOX_KEY)}));
+  const [chat] = useState(() =>
+    createAgentChat({
+      getCredential,
+      getSandboxId: () => readStored(SANDBOX_KEY),
+      onFinish: ({message}) => {
+        if (changedFiles(message)) refresh();
+      },
+    }),
+  );
   const {messages, setMessages, sendMessage, status, stop, error} = useChat({chat});
   const [preview, setPreview] = useState<Preview>({url: PREVIEW_URL});
   // The first prompt waits for the sandbox, so its request carries the sandbox id.
@@ -145,9 +156,22 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   // A server-rendered iframe can finish loading before hydration and its onLoad is lost.
   const isHydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
+  // A send waits for its provider's key: the text stays in the composer and no request goes out.
+  const [held, setHeld] = useState<{text: string; notice: string}>();
+  const deliver = useCallback(
+    async (text: string, sentModel: string) => {
+      const notice = await keyNotice(sentModel, getCredential);
+      setHeld(notice ? {text, notice} : undefined);
+      if (!notice) void sendMessage({text, metadata: {model: sentModel}}, {body: {model: sentModel}});
+    },
+    [sendMessage],
+  );
   const send = (text: string, sentModel: string) => {
-    if (isBusy) return;
-    sendMessage({text, metadata: {model: sentModel}}, {body: {model: sentModel}});
+    if (!isBusy) void deliver(text, sentModel);
+  };
+  const retryTurn = async () => {
+    const notice = await retry(chat, getCredential);
+    setHeld(notice ? {text: '', notice} : undefined);
   };
 
   const started = useRef(false);
@@ -178,9 +202,9 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     sandboxRequest.then(() => {
       if (firstSendCancelled.current) return;
       setIsConnecting(false);
-      sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+      void deliver(prompt, initialModelValue);
     });
-  }, [prompt, initialModelValue, sendMessage, setMessages]);
+  }, [prompt, initialModelValue, deliver, setMessages]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -195,6 +219,16 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
       isCurrent = false;
     };
   }, []);
+
+  // An approval the designer cannot see would wait forever, so it is denied with a reason the model reads.
+  const deniedApprovals = useRef(new Set<string>());
+  useEffect(() => {
+    for (const id of unshownApprovals(messages)) {
+      if (deniedApprovals.current.has(id)) continue;
+      deniedApprovals.current.add(id);
+      void chat.addToolApprovalResponse({id, approved: false, reason: APPROVAL_UNSHOWN});
+    }
+  }, [messages, chat]);
 
   useEffect(() => {
     if (messages.length > 0 && !isBusy) localStorage.setItem(CHAT_KEY, JSON.stringify(messages));
@@ -264,6 +298,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                   onModelChange={setModel}
                   isStreaming={isBusy}
                   onStop={stopTurn}
+                  held={held}
                 />
               }>
               {(isConnecting || status === 'submitted') && (
@@ -280,6 +315,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
               {error && error.message !== messages.at(-1)?.metadata?.notice && (
                 <ChatMessage sender="assistant">
                   <ChatMessageBubble variant="ghost">{error.message}</ChatMessageBubble>
+                  <Button label="Retry" variant="secondary" size="sm" onClick={retryTurn} />
                 </ChatMessage>
               )}
             </Conversation>

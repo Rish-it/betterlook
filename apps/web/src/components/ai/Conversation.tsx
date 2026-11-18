@@ -2,6 +2,7 @@ import type {ReactNode} from 'react';
 import type {AgentMessage, TurnEvent} from '@/lib/agent/types';
 import {ChatLayout, ChatMessageList} from '@astryxdesign/core/Chat';
 import {Message} from './Message';
+import {uniqueById} from './turn';
 
 type ConversationProps = {
   messages: AgentMessage[];
@@ -16,7 +17,7 @@ export function Conversation({messages, isStreaming, composer, onApproval, onEve
   return (
     <ChatLayout composer={composer}>
       <ChatMessageList isStreaming={isStreaming}>
-        {messages.map(m => (
+        {uniqueById(messages).map(m => (
           <Message key={m.id} message={m} onApproval={onApproval} onEvent={onEvent} />
         ))}
         {children}

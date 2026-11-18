@@ -33,9 +33,10 @@ type ComposerProps = {
   autoFocus?: boolean;
   model?: string;
   onModelChange?(model: string): void;
+  held?: {text: string; notice: string};
 };
 
-export function Composer({onSubmit, isStreaming = false, onStop, placeholder, autoFocus, model: controlledModel, onModelChange}: ComposerProps) {
+export function Composer({onSubmit, isStreaming = false, onStop, placeholder, autoFocus, model: controlledModel, onModelChange, held}: ComposerProps) {
   const [ownModel, setOwnModel] = useState(MODELS[0].id);
   const model = controlledModel ?? ownModel;
   const pickModel = (next: string) => {
@@ -55,6 +56,11 @@ export function Composer({onSubmit, isStreaming = false, onStop, placeholder, au
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
+  // A held send hands its text back, since submitting already cleared the input.
+  useEffect(() => {
+    if (held?.text) inputRef.current?.insertText(held.text);
+  }, [held]);
+
   return (
     <ChatComposer
       elevation="none"
@@ -63,6 +69,7 @@ export function Composer({onSubmit, isStreaming = false, onStop, placeholder, au
       isDisabled={isStreaming}
       isStopShown={isStreaming}
       onStop={onStop}
+      status={held && {type: 'warning', message: held.notice}}
       drawer={
         attachments.length > 0 && (
           <ChatComposerDrawer label="Attachments">
