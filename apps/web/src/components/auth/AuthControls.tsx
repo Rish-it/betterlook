@@ -55,8 +55,8 @@ const issueMessages: Record<ChatGPTIssue, string> = {
 
 const sessionUrl = '/api/auth/chatgpt/session';
 const apiKeyProviders: {id: ProviderId; name: string}[] = [
-  {id: 'openai', name: 'OpenAI'},
   {id: 'anthropic', name: 'Anthropic'},
+  {id: 'openai', name: 'OpenAI'},
 ];
 
 function takeCallbackIssue(): ChatGPTIssue | undefined {
@@ -244,9 +244,13 @@ export function AuthControls() {
       }}
       content={open && (
         <VStack gap={4}>
-          <ChatGPTConnection status={status} hasKey={keyStatus.openai} issue={issue} onSignOut={() => requestStatus('POST')} />
           {apiKeyProviders.map(({id, name}) => (
-            <ApiKeyControl key={id} name={name} isConnected={keyStatus[id]} onChange={value => updateApiKey(id, value)} />
+            <VStack key={id} gap={3} role="group" aria-label={name}>
+              <ApiKeyControl name={name} isConnected={keyStatus[id]} onChange={value => updateApiKey(id, value)} />
+              {id === 'openai' && (
+                <ChatGPTConnection status={status} hasKey={keyStatus.openai} issue={issue} onSignOut={() => requestStatus('POST')} />
+              )}
+            </VStack>
           ))}
           <Text type="supporting">Keys are kept on this page until you reload.</Text>
         </VStack>
