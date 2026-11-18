@@ -1,4 +1,4 @@
-export type ProviderId = 'anthropic';
+export type ProviderId = 'openai' | 'anthropic';
 
 export type ProviderCredential =
   | {provider: ProviderId; kind: 'api-key'; apiKey: string}
