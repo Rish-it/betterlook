@@ -186,6 +186,18 @@ export default function AiDevPage() {
               <Message message={m} />
             </State>
           ))}
+          <State label="user message with a Shift+Enter newline">
+            <div data-testid="multiline-user">
+              <Message message={f.multilineUser} />
+            </div>
+          </State>
+          {f.noticeMessages.map(m => (
+            <State key={m.id} label={`turn notice: ${m.metadata?.status}`}>
+              <div data-testid={m.id}>
+                <Message message={m} />
+              </div>
+            </State>
+          ))}
         </Section>
 
         <Section title="Live turn shape">

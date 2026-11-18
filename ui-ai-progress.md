@@ -239,3 +239,23 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
    - `Workspace.tsx` renders its own Stop `Button` and does not pass `isStreaming={isBusy}` / `onStop={stop}` to `Composer`. The composer's built-in stop and disabled state therefore can't be re-checked against the live workspace until those props are passed.
    Proposal: AI-CORE makes two small changes in `Workspace.tsx`, (a) import `MODELS` from `@/lib/agent/models` and use `m.id`, and (b) pass `isStreaming={isBusy} onStop={stop}` to `Composer` and drop its separate Stop button. I then switch `ModelPicker`, `Composer` and `Message` to `lib/agent/models.ts` and delete `composer/models.ts` in the same change. Alternatively, let me make (a) and (b) in `Workspace.tsx` myself now. Which one?
 4. Answered (orchestrator): AI-CORE adds `AgentDataParts` and `AgentMessage`, and its stream writes a `data-denied` part next to the tool error; wire-up renders `DeniedCall` from that once it lands. Original question: how will a policy-denied call reach the UI? AI-CORE's plan returns it to the model as a tool error. If it arrives as an ordinary `output-error` tool part, the chat can't tell it from a real error. A `DeniedCall` on the turn, or a data part, would let me render `DeniedCall` instead.
+
+## AI-UI-NOTICE (orchestrator follow-up)
+
+Merged `betterlook` 4a88c1ef.
+
+1. Turn notice.
+   - `Message` renders `message.metadata.notice` at the end of the assistant message, as quiet supporting text (`Text` supporting, secondary, no border). It sits after the parts and before the checkpoint marker, so a failed-verify notice reads straight into Restore.
+   - Where it shows: the message notice is the one place for turn outcomes (failed verify after repair, step limit). The workspace's useChat `error` line now only renders when its text differs from the last message's notice, which leaves it for errors that never reached a message.
+   - Observed: on a stream error, AI-CORE sends `error` then `finish` with the same notice, but useChat stops at the error chunk and never applies the finish metadata. That text therefore shows once, from the workspace error line.
+   - Live checks (`.screenshots/notice-live.mjs`): the verify-failed text appears exactly once as the notice (screenshot `.screenshots/ai-notice-live-verify.png`). In error mode the sandbox text appears exactly once (screenshot `.screenshots/ai-notice-live-error.png`).
+2. Shift+Enter newline lost in the user bubble.
+   - Check first (`.screenshots/newline.mjs`, dev page fixture "Make the nav sticky\nand keep the logo on the left"): before the fix it failed, with innerText on one line joined by a space and exit 1.
+   - Fix: `whiteSpace: 'pre-wrap'` through the bubble's `xstyle` (Astryx has no prop for it). After the fix: 2 lines, exit 0.
+3. Preview spinner stuck when the sandbox is not configured.
+   - Check first (`.screenshots/spinner.mjs`, real `/api/sandbox` returning 503 because no env is set): before the fix `aria-busy` was `true` at 1s, 3s and 5s and the spinner was present, exit 1.
+   - Root cause: the iframe loads `PREVIEW_URL` and its `onLoad` clears loading. `requestSandbox` then resolves on the error path with the same url and sets loading again, but an unchanged `src` never fires `onLoad` again.
+   - Fix: loading is only set when the resolved url differs from `PREVIEW_URL`. After the fix: `false`, `false`, `false`, no spinner, exit 0.
+   - A real sandbox url still shows, then clears, the spinner (`aria-busy` false after load in `notice-live.mjs`). The first-send checks still pass.
+- Screenshots, checked by eye: `.screenshots/ai-notice-dev-{light,dark}.png` (the two-line user bubble plus the failed, step-limit and error notices).
+- Checks: `bun run typecheck` exit 0 and `bun test` 68 pass, both on two clean runs. `react-doctor`: unchanged set; the two index-key false positives, `Workspace.tsx:160`/`:185` intentional start-up waits, and `lib/agent/verify.ts:29` (AI-CORE's).
