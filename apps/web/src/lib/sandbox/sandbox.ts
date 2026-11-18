@@ -109,6 +109,10 @@ export async function createSandbox(api?: SandboxApi): Promise<SandboxInfo> {
   return info(await newSandbox(api ?? (await vercelSandbox()), true));
 }
 
+export async function createProject(api?: SandboxApi): Promise<Project> {
+  return withStop(await newSandbox(api ?? (await vercelSandbox()), false));
+}
+
 const resume = async (sandboxId: string, api?: SandboxApi) =>
   (api ?? (await vercelSandbox())).Sandbox.get({name: sandboxId, resume: true, onResume: startPreview, ...credentials()});
 

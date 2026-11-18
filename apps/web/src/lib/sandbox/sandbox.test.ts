@@ -2,7 +2,7 @@
 import {expect, test} from 'bun:test';
 import {POST} from '@/app/api/sandbox/route';
 import {SANDBOX_CONFIG} from '@/lib/agent/config';
-import {BASE_NAME, connectSandbox, createSandbox, openProject} from './sandbox';
+import {BASE_NAME, connectSandbox, createProject, createSandbox, openProject} from './sandbox';
 import {PREVIEW_PORT, STARTER_FILES} from './starter';
 
 const STARTER_SETUP = [
@@ -83,7 +83,8 @@ test('later sandboxes reuse the snapshot and never run npm install', async () =>
   await createSandbox(api);
   calls.length = 0;
   await createSandbox(api);
-  expect(calls).toEqual([created(true), 'npm run dev &']);
+  await createProject(api);
+  expect(calls).toEqual([created(true), 'npm run dev &', created(false), 'npm run dev &']);
 });
 
 test('an existing base snapshot is found by name, skipping the install', async () => {

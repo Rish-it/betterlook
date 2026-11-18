@@ -27,25 +27,23 @@ const editingModel = () =>
     doStream: [toolStep([['e1', 'edit_file', {path: 'src/App.tsx', oldString: 'Hi', newString: 'Hello'}]]), textStep('Done.')],
   });
 
-// A run is in flight from its sandbox until its "after" screenshot (the second capture).
+// A run holds a sandbox from creation until it is stopped.
+const USAGE = {vcpus: 2, activeCpuMs: 1500, durationMs: 90_000};
 function projects() {
   let inFlight = 0;
   let maxInFlight = 0;
-  const captures = new Map<string, number>();
+  let stops = 0;
   return {
-    stats: () => ({maxInFlight}),
+    stats: () => ({maxInFlight, inFlight, stops}),
     project: async () => {
       inFlight++;
       maxInFlight = Math.max(maxInFlight, inFlight);
       const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'}, cmd => (cmd === 'node' ? {exitCode: 0, output: '[]'} : {exitCode: 0, output: ''}));
       cleanups.push(t.cleanup);
-      return t.project;
+      return {...t.project, stop: async () => (inFlight--, stops++, USAGE)};
     },
-    capture: async (project: Project) => {
+    capture: async (_project: Project) => {
       await new Promise(r => setTimeout(r, 5));
-      const n = (captures.get(project.root) ?? 0) + 1;
-      captures.set(project.root, n);
-      if (n === 2) inFlight--;
       return new Uint8Array([137, 80, 78, 71]);
     },
   };
@@ -92,7 +90,7 @@ test('k runs per task go through runAgent, stay under the concurrency cap and ea
   for (const r of results) {
     expect(readdirSync(r.dir).sort()).toEqual(['after.png', 'before.png', 'diff.patch', 'task.json', 'turn.json', 'verify.json']);
     const turn = JSON.parse(readFileSync(join(r.dir, 'turn.json'), 'utf8'));
-    expect(turn).toMatchObject({status: 'passed', systemPromptHash: SYSTEM_PROMPT_HASH, prompt: tasks.find(t => t.id === r.taskId)!.prompt});
+    expect(turn).toMatchObject({status: 'passed', sandbox: USAGE, systemPromptHash: SYSTEM_PROMPT_HASH, prompt: tasks.find(t => t.id === r.taskId)!.prompt});
     expect(turn.checkpoint.id).toMatch(/^[0-9a-f]{40}$/);
     expect(readFileSync(join(r.dir, 'diff.patch'), 'utf8')).toContain('+<h1>Hello</h1>');
     expect(JSON.parse(readFileSync(join(r.dir, 'verify.json'), 'utf8'))).toMatchObject({verify: {ok: true}, repairAttempted: false});
@@ -134,7 +132,8 @@ test('a rate-limited run backs off and retries on a fresh sandbox', async () => 
   expect(result).toMatchObject({status: 'passed', attempts: 2});
   expect(waits).toEqual([5_000]);
   expect(projectsMade).toBe(2);
-  expect(logs).toEqual(['only run 1: rate limited, retrying in 5s', 'only run 1: passed']);
+  expect(p.stats().stops).toBe(2);
+  expect(logs).toEqual(['only run 1: rate limited, retrying in 5s', `only run 1: passed, sandbox ${JSON.stringify(USAGE)}`]);
 });
 
 test('the preview screenshot comes from the checker inside the sandbox and retries while the dev server starts', async () => {

@@ -6,7 +6,7 @@ import {languageModel} from '../src/lib/agent/model';
 import {MODELS, providerOf} from '../src/lib/agent/models';
 import {evalCredential, parseTasks, previewScreenshot, runTasks} from '../src/lib/agent/runner';
 import {flushTraces} from '../src/lib/agent/trace';
-import {createSandbox, openProject, sandboxConfigured} from '../src/lib/sandbox/sandbox';
+import {createProject, sandboxConfigured} from '../src/lib/sandbox/sandbox';
 
 const {values} = parseArgs({
   options: {
@@ -33,7 +33,7 @@ const results = await runTasks({
   concurrency: Number(values.concurrency),
   outDir,
   model: () => languageModel(values.model, credential),
-  project: async () => openProject((await createSandbox()).sandboxId),
+  project: () => createProject(),
   capture: project => previewScreenshot(project),
   log: line => console.log(line),
 });
