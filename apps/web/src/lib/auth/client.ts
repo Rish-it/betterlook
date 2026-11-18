@@ -1,14 +1,16 @@
 'use client';
 
-import type {ProviderCredential} from '@/lib/agent/types';
+import type {ProviderCredential, ProviderId} from '@/lib/agent/types';
 
-let credential: Extract<ProviderCredential, {kind: 'api-key'}> | null = null;
+const apiKeys = new Map<ProviderId, string>();
 
-export function setOpenAIApiKey(value: string) {
+export function setApiKey(provider: ProviderId, value: string) {
   const apiKey = value.trim();
-  credential = apiKey ? {provider: 'openai', kind: 'api-key', apiKey} : null;
+  if (apiKey) apiKeys.set(provider, apiKey);
+  else apiKeys.delete(provider);
 }
 
-export function getCredential(): ProviderCredential | null {
-  return credential && {...credential};
+export function getCredential(provider: ProviderId): ProviderCredential | null {
+  const apiKey = apiKeys.get(provider);
+  return apiKey ? {provider, kind: 'api-key', apiKey} : null;
 }
