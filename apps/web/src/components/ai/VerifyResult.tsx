@@ -29,14 +29,17 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 
 export function VerifyResult({result}: {result: VerifyResultRecord}) {
   const failed = result.checks.filter(c => c.status === 'failed').map(c => NAMES[c.name]);
-  const summary = result.ok ? 'Checks passed' : `${failed.join(', ')} failed`;
+  const skipped = result.checks.filter(c => c.status === 'skipped').map(c => NAMES[c.name]);
+  const state = !result.ok ? 'failed' : skipped.length ? 'unverified' : 'passed';
+  const summary = {passed: 'Checks passed', unverified: `Not verified: ${skipped.join(', ')} check could not run`, failed: `${failed.join(', ')} failed`}[state];
+  const icon = {passed: 'success', unverified: 'warning', failed: 'error'} as const;
   return (
     <div {...stylex.props(styles.root)}>
       <Collapsible
         defaultIsOpen={false}
         trigger={
           <HStack gap={2} align="center">
-            <Icon icon={result.ok ? 'success' : 'error'} size="sm" color={result.ok ? 'success' : 'error'} />
+            <Icon icon={icon[state]} size="sm" color={icon[state]} />
             <Text type="supporting">{summary}</Text>
           </HStack>
         }>

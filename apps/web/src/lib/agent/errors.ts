@@ -5,6 +5,7 @@ export const KEY_REJECTED = 'Your API key or sign-in was rejected. Check it and 
 export const RATE_LIMITED = 'The model provider is rate limiting requests. Wait a minute and try again.';
 export const PROVIDER_FAILED = 'The model provider returned an error. Try again.';
 export const VERIFY_FAILED = 'The change still fails its checks after one repair attempt. Restore the previous version or describe what to fix.';
+export const UNVERIFIED = 'The change builds, but the visual check could not run, so it is not verified. Check the preview yourself.';
 export const STEP_LIMIT = 'The agent hit its step limit before finishing. Send another message to let it continue.';
 export const REFUSED = 'The model declined this request. Rephrase it or pick another model.';
 export const SANDBOX_FAILED = 'The preview sandbox stopped responding. Reload to try again.';

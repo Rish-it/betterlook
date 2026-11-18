@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 function setup() {
-  const t = tempProject(STARTER);
+  const t = tempProject(STARTER, cmd => (cmd === 'node' ? {exitCode: 0, output: '[]'} : {exitCode: 0, output: ''}));
   cleanups.push(t.cleanup);
   return t;
 }

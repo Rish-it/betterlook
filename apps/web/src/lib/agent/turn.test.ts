@@ -5,6 +5,7 @@ import {MockLanguageModelV4} from 'ai/test';
 import {POST as eventsPOST} from '@/app/api/events/route';
 import {POST as restorePOST} from '@/app/api/restore/route';
 import {restoreCheckpoint} from './checkpoint';
+import {UNVERIFIED} from './errors';
 import {repairMessage} from './run';
 import {runTurn, tempProject, textStep, toolStep, type Scripted} from './test-project';
 import {runtimeErrors} from './verify';
@@ -110,6 +111,15 @@ test('runtime errors fail the runtime check; a checker that cannot run is skippe
       ],
     }),
   ).toBe('Verify failed after your change. Fix these errors:\n\ntypecheck:\nTS1');
+});
+
+test('a turn whose runtime check could not run is not verified, never passed', async () => {
+  const {project} = setup(cmd => (cmd === 'node' ? fail('Error: Cannot find module /tmp/betterlook/check.mjs') : pass));
+  const model = new MockLanguageModelV4({doStream: [edit('e1', 'className="hero-heading blue"'), textStep('Done.')]});
+  const {record, message} = await runTurn({model, messages: [{role: 'user', content: 'make it blue'}], project});
+  expect(record.verify?.checks.map(c => c.status)).toEqual(['passed', 'passed', 'skipped']);
+  expect(record).toMatchObject({status: 'unverified', repairAttempted: false});
+  expect(message.metadata).toMatchObject({status: 'unverified', notice: UNVERIFIED});
 });
 
 test('keep is logged through /api/events; restore validates its input', async () => {

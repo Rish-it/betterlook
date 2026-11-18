@@ -151,13 +151,21 @@ export const approval: PendingApproval = {
 `,
 };
 
-export const verifyResults: Record<'passed' | 'typecheckFailed' | 'buildFailed' | 'runtimeFailed', VerifyResult> = {
+export const verifyResults: Record<'passed' | 'runtimeSkipped' | 'typecheckFailed' | 'buildFailed' | 'runtimeFailed', VerifyResult> = {
   passed: {
     ok: true,
     checks: [
       {name: 'typecheck', status: 'passed', errors: [], durationMs: 2140},
       {name: 'build', status: 'passed', errors: [], durationMs: 6820},
       {name: 'runtime', status: 'passed', errors: [], durationMs: 1310},
+    ],
+  },
+  runtimeSkipped: {
+    ok: true,
+    checks: [
+      {name: 'typecheck', status: 'passed', errors: [], durationMs: 2140},
+      {name: 'build', status: 'passed', errors: [], durationMs: 6820},
+      {name: 'runtime', status: 'skipped', errors: ['The runtime check could not run: Cannot find module /tmp/betterlook/check.mjs'], durationMs: 40},
     ],
   },
   typecheckFailed: {

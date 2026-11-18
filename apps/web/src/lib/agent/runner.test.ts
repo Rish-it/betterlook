@@ -113,6 +113,14 @@ test('agent:run never holds more than 3 sandboxes, whatever concurrency is asked
   expect(p.stats()).toEqual({maxInFlight: 3, inFlight: 0, stops: 8});
 });
 
+test('a run whose runtime check was skipped is reported as unverified, not passed', async () => {
+  const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'});
+  cleanups.push(t.cleanup);
+  const [result] = await runTasks({tasks: [{id: 'a', prompt: 'p'}], runs: 1, outDir: outDir(), model: editingModel, project: async () => t.project, capture: async () => null});
+  expect(result.status).toBe('unverified');
+  expect(JSON.parse(readFileSync(join(result.dir, 'turn.json'), 'utf8')).status).toBe('unverified');
+});
+
 test('a paused sandbox quota ends the run with a clear message instead of a crash', async () => {
   const lines: string[] = [];
   let created = 0;

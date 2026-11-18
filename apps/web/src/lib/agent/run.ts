@@ -15,7 +15,7 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, REFUSED, sandboxMessage, STEP_LIMIT, userMessage, VERIFY_FAILED} from './errors';
+import {errorStatus, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
@@ -40,6 +40,7 @@ const addUsage = (total: Usage, u: LanguageModelUsage) => {
 export function noticeFor(record: TurnRecord): string | undefined {
   if (record.status === 'error') return record.error;
   if (record.status === 'failed') return VERIFY_FAILED;
+  if (record.status === 'unverified') return UNVERIFIED;
   if (record.stepLimitReached && record.status !== 'stopped') return STEP_LIMIT;
   return undefined;
 }
@@ -48,6 +49,9 @@ const lastUserText = (messages: ModelMessage[]) => {
   const content = messages.findLast(m => m.role === 'user')?.content;
   return typeof content === 'string' ? content : (content ?? []).map(p => (p.type === 'text' ? p.text : '')).join('');
 };
+
+// A skipped check is never a pass: the turn is only 'passed' when every check ran and passed.
+const checkedStatus = (verify: VerifyResult) => (verify.checks.every(c => c.status === 'passed') ? 'passed' : 'unverified');
 
 export const repairMessage = (verify: VerifyResult) =>
   REPAIR_PROMPT.replace(
@@ -231,7 +235,7 @@ export function runAgent({
         writer.write({type: 'data-diff', id: 'diff', data: saved.diff});
         const verify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'verify', data: verify});
-        if (verify.ok) return end({status: 'passed', verify, checkpoint: saved.checkpoint, ...saved.diff});
+        if (verify.ok) return end({status: checkedStatus(verify), verify, checkpoint: saved.checkpoint, ...saved.diff});
 
         const repair = callModel([...messages, ...(await first.result.response).messages, {role: 'user', content: repairMessage(verify)}]);
         await pipe(toUIMessageStream<ToolSet, AgentMessage>({stream: repair.result.stream, sendStart: false, sendFinish: false, onError: userMessage}));
@@ -243,7 +247,7 @@ export function runAgent({
         const repairVerify = await verifyProject(project);
         writer.write({type: 'data-verify', id: 'repair-verify', data: repairVerify});
         end({
-          status: repairVerify.ok ? 'passed' : 'failed',
+          status: repairVerify.ok ? checkedStatus(repairVerify) : 'failed',
           verify,
           repairAttempted: true,
           repairVerify,
