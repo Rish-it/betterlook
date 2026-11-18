@@ -1,5 +1,6 @@
 'use client';
 
+import {useRouter} from 'next/navigation';
 import * as stylex from '@stylexjs/stylex';
 import {Heading} from '@astryxdesign/core/Text';
 import {VStack} from '@astryxdesign/core/Layout';
@@ -17,11 +18,15 @@ const styles = stylex.create({
 });
 
 export default function Home() {
+  const router = useRouter();
+  const send = (prompt: string, model: string) =>
+    router.push(`/workspace?${new URLSearchParams({prompt, model})}`);
+
   return (
     <main {...stylex.props(styles.main)}>
       <VStack gap={6} xstyle={styles.column}>
         <Heading level={1}>What should we change?</Heading>
-        <Composer autoFocus placeholder="Describe a change to your app" onSubmit={() => {}} />
+        <Composer autoFocus placeholder="Describe a change to your app" onSubmit={send} />
       </VStack>
     </main>
   );
