@@ -131,12 +131,14 @@ createRoot(document.getElementById('root')!).render(
 
       <section data-section="pricing" className="section">
         <h2 className="section-title">Pricing</h2>
-        <div className="plan">
-          <div className="plan-inner">
-            <h3 className="card-title">Team</h3>
-            <p className="plan-price">$24 per seat</p>
-            <p className="card-copy">Unlimited edits and 5 projects.</p>
-            <button className="button button-secondary">Choose plan</button>
+        <div className="plans">
+          <div className="plan">
+            <div className="plan-inner">
+              <h3 className="card-title">Team</h3>
+              <p className="plan-price">$24 per seat</p>
+              <p className="card-copy">Unlimited edits and 5 projects.</p>
+              <button className="button button-secondary">Choose plan</button>
+            </div>
           </div>
         </div>
       </section>
@@ -269,8 +271,13 @@ p {
   color: #525252;
 }
 
+.plans {
+  display: flex;
+  gap: 16px;
+}
+
 .plan {
-  max-width: 360px;
+  width: 360px;
   padding: 8px;
   border-radius: 16px;
   background: #f0f0f0;
