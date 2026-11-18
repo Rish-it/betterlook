@@ -19,9 +19,37 @@ const credentials = () => {
   return token && teamId && projectId ? {token, teamId, projectId} : {};
 };
 
-async function run(sandbox: Sandbox, cmd: string, args: string[]) {
-  const result = await sandbox.runCommand(cmd, args);
-  if (result.exitCode !== 0) throw new Error(`${cmd} ${args[0]} failed (exit ${result.exitCode})`);
+async function run(sandbox: Sandbox, cmd: string, args: string[], opts: {sudo?: boolean; env?: Record<string, string>} = {}) {
+  const result = await sandbox.runCommand({cmd, args, ...opts});
+  if (result.exitCode === 0) return;
+  const failed = `${cmd} ${args[0]} failed (exit ${result.exitCode})`;
+  console.error(`[sandbox] ${failed}:`, (await result.output('stderr').catch(() => '')).slice(-2_000));
+  throw new Error(failed);
+}
+
+// Chromium's shared libraries on the node24 runtime (Amazon Linux 2023, dnf). Playwright's --with-deps only knows apt.
+const CHROMIUM_LIBS = [
+  'nss', 'nss-tools', 'nspr', 'libxkbcommon', 'atk', 'at-spi2-atk', 'at-spi2-core', 'libXcomposite', 'libXdamage', 'libXrandr',
+  'libXfixes', 'libXcursor', 'libXi', 'libXtst', 'libXScrnSaver', 'libXext', 'mesa-libgbm', 'libdrm', 'mesa-libGL', 'mesa-libEGL',
+  'cups-libs', 'alsa-lib', 'pango', 'cairo', 'gtk3', 'dbus-libs',
+];
+
+async function installChecker(sandbox: Sandbox) {
+  await sandbox.mkDir(CHECKER_DIR);
+  await sandbox.writeFiles([{path: CHECKER_SCRIPT, content: CHECKER_SOURCE}]);
+  await run(sandbox, 'npm', ['install', '--prefix', CHECKER_DIR, '--no-audit', '--no-fund', CHECKER_PLAYWRIGHT]);
+  await run(sandbox, 'dnf', ['install', '-y', '--skip-broken', ...CHROMIUM_LIBS], {sudo: true});
+  await run(sandbox, 'npx', ['--prefix', CHECKER_DIR, 'playwright', 'install', 'chromium'], {env: CHECKER_ENV});
+}
+
+// Any failure stops the sandbox first, so a broken setup never keeps spending quota until its timeout.
+async function stopOnFailure<T>(sandbox: Sandbox, setup: () => Promise<T>): Promise<T> {
+  try {
+    return await setup();
+  } catch (error) {
+    await sandbox.stop().catch(() => {});
+    throw error;
+  }
 }
 
 const startPreview = async (sandbox: Sandbox) => {
@@ -45,16 +73,11 @@ async function installStarter(sandbox: Sandbox) {
   await run(sandbox, 'git', ['config', 'user.email', 'agent@betterlook.invalid']);
   await run(sandbox, 'git', ['add', '-A']);
   await run(sandbox, 'git', ['commit', '-q', '-m', 'starter']);
-  await sandbox.mkDir(CHECKER_DIR);
-  await sandbox.writeFiles([{path: CHECKER_SCRIPT, content: CHECKER_SOURCE}]);
-  await run(sandbox, 'npm', ['install', '--prefix', CHECKER_DIR, '--no-audit', '--no-fund', CHECKER_PLAYWRIGHT]);
-  const browsers = await sandbox.runCommand({
-    cmd: 'npx',
-    args: ['--prefix', CHECKER_DIR, 'playwright', 'install', '--with-deps', 'chromium'],
-    env: CHECKER_ENV,
-    sudo: true,
-  });
-  if (browsers.exitCode !== 0) throw new Error(`playwright install failed (exit ${browsers.exitCode})`);
+  // Without the checker the preview still works; verify then reports the runtime check as skipped.
+  return installChecker(sandbox).then(
+    () => true,
+    error => (console.error('[sandbox] runtime checker not installed:', error.message), false),
+  );
 }
 
 // The installed starter is snapshotted once per starter version, so new sandboxes skip npm and Playwright installs.
@@ -63,8 +86,11 @@ async function buildBase(api: SandboxApi) {
   const ready = snapshots.find(s => s.status === 'created');
   if (ready) return ready.id;
   const sandbox = await api.Sandbox.getOrCreate({name: BASE_NAME, runtime: 'node24', persistent: false, resume: true, ...resources, ...credentials()});
-  await installStarter(sandbox);
-  return (await sandbox.snapshot({expiration: 0})).snapshotId;
+  return stopOnFailure(sandbox, async () => {
+    const checker = await installStarter(sandbox);
+    // A base without the checker expires in a day, so a later sandbox retries the install.
+    return (await sandbox.snapshot({expiration: checker ? 0 : 24 * 60 * 60_000})).snapshotId;
+  });
 }
 
 // ponytail: per-process memo; two cold servers building the same base at once share one named sandbox. Add a lock if that shows up.
@@ -89,7 +115,7 @@ async function newSandbox(api: SandboxApi, persistent: boolean) {
     ...resources,
     ...credentials(),
   });
-  await startPreview(sandbox);
+  await stopOnFailure(sandbox, () => startPreview(sandbox));
   return sandbox;
 }
 

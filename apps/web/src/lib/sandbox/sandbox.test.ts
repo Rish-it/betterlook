@@ -1,5 +1,5 @@
 /// <reference types="bun" />
-import {expect, test} from 'bun:test';
+import {expect, spyOn, test} from 'bun:test';
 import {POST} from '@/app/api/sandbox/route';
 import {SANDBOX_CONFIG} from '@/lib/agent/config';
 import {BASE_NAME, connectSandbox, createProject, createSandbox, openProject} from './sandbox';
@@ -16,10 +16,11 @@ const STARTER_SETUP = [
   'mkdir /tmp/betterlook',
   'write /tmp/betterlook/check.mjs',
   'npm install --prefix /tmp/betterlook --no-audit --no-fund playwright@1.58.0',
-  'sudo npx --prefix /tmp/betterlook playwright install --with-deps chromium',
+  expect.stringMatching(/^sudo dnf install -y --skip-broken nss .*mesa-libgbm/),
+  'npx --prefix /tmp/betterlook playwright install chromium',
 ];
 
-function fakeApi({failOn, snapshots = [], expiresInMs = SANDBOX_CONFIG.timeoutMs}: {failOn?: string; snapshots?: {id: string; status: string}[]; expiresInMs?: number} = {}) {
+function fakeApi({failOn, throwOn, snapshots = [], expiresInMs = SANDBOX_CONFIG.timeoutMs}: {failOn?: string; throwOn?: string; snapshots?: {id: string; status: string}[]; expiresInMs?: number} = {}) {
   const calls: string[] = [];
   const sandbox = {
     name: 'sbx-test',
@@ -34,7 +35,8 @@ function fakeApi({failOn, snapshots = [], expiresInMs = SANDBOX_CONFIG.timeoutMs
           ? `${cmdOrParams} ${args.join(' ')}`
           : `${cmdOrParams.sudo ? 'sudo ' : ''}${cmdOrParams.cmd} ${cmdOrParams.args.join(' ')}${cmdOrParams.detached ? ' &' : ''}`;
       calls.push(line);
-      return {exitCode: failOn && line.startsWith(failOn) ? 1 : 0};
+      if (throwOn && line.startsWith(throwOn)) throw new Error('sandbox unreachable');
+      return {exitCode: failOn && line.startsWith(failOn) ? 1 : 0, output: async () => 'stderr tail'};
     },
     snapshot: async (opts: unknown) => (calls.push(`snapshot ${JSON.stringify(opts)}`), {snapshotId: 'snap-base'}),
     extendTimeout: async (ms: number) => void calls.push(`extend ${Math.round(ms / 60_000)}m`),
@@ -93,13 +95,32 @@ test('an existing base snapshot is found by name, skipping the install', async (
   expect(calls.slice(1)).toEqual([created(true, 'snap-ready'), 'npm run dev &']);
 });
 
-test('a failed setup command stops the base build and the next sandbox retries it', async () => {
+test('a failed setup command stops the base sandbox, logs the stderr tail, and the next sandbox retries it', async () => {
   const {api, calls} = fakeApi({failOn: 'npm install'});
+  const logged = spyOn(console, 'error').mockImplementation(() => {});
   await expect(createSandbox(api)).rejects.toThrow('npm install failed (exit 1)');
+  expect(logged.mock.calls[0]).toEqual(['[sandbox] npm install failed (exit 1):', 'stderr tail']);
   expect(calls.some(c => c.startsWith('git') || c.startsWith('snapshot') || c.startsWith('create'))).toBe(false);
+  expect(calls.at(-1)).toBe('stop');
   calls.length = 0;
   await expect(createSandbox(api)).rejects.toThrow('npm install failed (exit 1)');
   expect(calls[0]).toStartWith('list');
+  logged.mockRestore();
+});
+
+test('a failed runtime checker install still gives a working sandbox, and its base snapshot expires in a day', async () => {
+  const {api, calls} = fakeApi({failOn: 'npx --prefix /tmp/betterlook playwright'});
+  const logged = spyOn(console, 'error').mockImplementation(() => {});
+  expect(await createSandbox(api)).toEqual({sandboxId: 'sbx-test', previewUrl: `https://sbx-test-${PREVIEW_PORT}.example`});
+  expect(logged.mock.calls.at(-1)).toEqual(['[sandbox] runtime checker not installed:', 'npx --prefix failed (exit 1)']);
+  logged.mockRestore();
+  expect(calls.slice(-3)).toEqual(['snapshot {"expiration":86400000}', created(true), 'npm run dev &']);
+});
+
+test('a sandbox whose preview fails to start is stopped before the error is thrown', async () => {
+  const {api, calls} = fakeApi({throwOn: 'npm run dev', snapshots: [{id: 'snap-base', status: 'created'}]});
+  await expect(createSandbox(api)).rejects.toThrow('sandbox unreachable');
+  expect(calls.slice(-2)).toEqual(['npm run dev &', 'stop']);
 });
 
 test('reconnecting resumes the same sandbox and restarts the preview server', async () => {
