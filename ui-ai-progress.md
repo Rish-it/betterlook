@@ -90,3 +90,7 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
 
 1. Map above: OK to proceed?
 2. For AI-CORE, through the orchestrator: the `ai` dependency (for `UIMessage` and `ToolUIPart`). types.ts v1 is merged.
+3. Model list move (merged `betterlook` 1aa4c1c3, clean, typecheck passes). Two things block it, and both touch `workspace/Workspace.tsx`, which is AI-CORE's file until my wire-up item:
+   - `Workspace.tsx` imports `MODELS` from `@/composer/models` (lines 27, 119, 183) and reads `m.value`. `lib/agent/models.ts` uses `{id, label, provider}`. Deleting `composer/models.ts` breaks typecheck in `Workspace.tsx`. Pointing only `ModelPicker` at the new list leaves the workspace's initial-model check on the old Claude/Gemini ids, so the picker and the sent model disagree.
+   - `Workspace.tsx` renders its own Stop `Button` and does not pass `isStreaming={isBusy}` / `onStop={stop}` to `Composer`. The composer's built-in stop and disabled state therefore can't be re-checked against the live workspace until those props are passed.
+   Proposal: AI-CORE makes two small changes in `Workspace.tsx`, (a) import `MODELS` from `@/lib/agent/models` and use `m.id`, and (b) pass `isStreaming={isBusy} onStop={stop}` to `Composer` and drop its separate Stop button. I then switch `ModelPicker`, `Composer` and `Message` to `lib/agent/models.ts` and delete `composer/models.ts` in the same change. Alternatively, let me make (a) and (b) in `Workspace.tsx` myself now. Which one?
