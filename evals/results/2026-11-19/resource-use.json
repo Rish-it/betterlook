@@ -1,0 +1,17 @@
+{
+  "active_cpu_ms": {
+    "reported_haiku_cohort": 391640,
+    "all_haiku_executions_including_extras": 464805,
+    "sonnet": 448773,
+    "smoke": 17777,
+    "successful_base_rebuild": 43561,
+    "failed_base_setup_before_reset": 8895,
+    "separate_browser_preflight": 8374
+  },
+  "total_observed_active_cpu_ms": 992185,
+  "total_observed_active_cpu_minutes": 16.536416666666668,
+  "original_84_run_projection_ms": 1493268,
+  "projection_plus_successful_rebuild_ms": 1536829,
+  "quota_remaining_verified": false,
+  "source": "SDK active CPU on stopped sessions; original projection from one-task smoke"
+}
