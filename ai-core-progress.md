@@ -70,7 +70,12 @@ Risks found during the audit:
 
 ### Item 1: baseline
 
-BLOCKED. See Questions 1, 2 and 4.
+BLOCKED on the task file only (Question 1). The plan above also needs the founder's OK before item 2 starts.
+
+Ready for the baseline:
+- `.md` reader: `parseTaskMarkdown(text)` in `lib/agent/runner.ts`, selected by the `.md` extension in `scripts/agent-run.ts`. Unit test with inline strings only: two sections parse to `{id, prompt, starter}` (notes dropped, intro text ignored); a section without a prompt or with an empty one fails as `Task <id> needs a prompt.`; an unknown starter, a duplicate id and a file with no sections each fail with a clear message.
+- Evidence: `bun run typecheck` + `bun run test` run 1: pass (86), run 2: pass (86). `scripts/agent-run.ts` bundles (`agent-run.mjs 41.44 KB`).
+- Baseline columns: Anthropic live. OpenAI is marked skipped until `OPENAI_EVAL_API_KEY` exists. Recorded from generic verify only: typecheck, build, runtime errors, whether the visual check ran or was skipped, pass^k on those, cost per completed task, cache hit ratio, p50/p95 turn latency, tokens per turn. Quality grading is left empty for the founder.
 
 ## Folded-in orchestrator items
 
@@ -80,12 +85,17 @@ BLOCKED. See Questions 1, 2 and 4.
 
 ## Questions for the founder
 
-1. **Frozen task file missing (blocks the baseline).** `evals/tasks/sample.md` is not in the repo or in this worktree. Please add it on `betterlook`; I won't create or edit it.
-2. **Task file format.** The runner reads a JSON array `[{"id", "prompt", ...extra}]` today, and your file is Markdown. How should a `.md` task file be read: one task per `##` heading, with the heading as the id and the body as the prompt? Or is there a structure in the file I should follow? I'll add a reader for your format and won't convert or rewrite the file.
-3. **No-retry instruction.** The standard says the system prompt tells the model not to retry a denied call. The system prompt is yours and empty. Either you add that sentence, or I put it into the denial result the model receives (harness text, not the system prompt). Which one?
-4. **Baseline scope and price source.** `apps/web/.env` has `ANTHROPIC_EVAL_API_KEY` but no `OPENAI_EVAL_API_KEY`, so the baseline and the "same task on both providers" check can only run on Anthropic. Do you want an OpenAI eval key added, or the OpenAI column left empty? For cost per completed task, may I read Langfuse's computed cost per trace after the run? The alternative is a price table in code, which you would need to sign off.
+Answered 2026-11-18 (via orchestrator):
+
+1. **Task file:** `evals/tasks/sample.md`, written by the founder. Don't create it. The baseline waits for the orchestrator's message that it is in the repo. **Open: still missing.**
+2. **Format:** one task per `## <task id>` section with `prompt:` (one line), `starter:` (default if omitted) and `notes:` (for the founder; the runner ignores it). A section without a prompt fails with its task id and is never skipped. The runner grades nothing from this file. Done: `parseTaskMarkdown` in `runner.ts`; `agent:run --tasks <file>.md` uses it, and `.json` still works.
+3. **No-retry:** in the harness, not the system prompt. A policy denial's tool result says it was denied by policy, gives the reason and says not to retry the same call. `system-prompt.ts` stays frozen. Lands in the Approvals and policy item.
+4. **OpenAI:** no eval key yet. Build and unit-test the OpenAI adapter against a fake endpoint, mark live OpenAI runs as skipped in the baseline, and read `OPENAI_EVAL_API_KEY` when it appears. Don't ask for it. **Cost:** per turn, from the provider's usage fields (input, output, cache read, cache write) times a price table in the model registry. Prices live in one file, each with its date and official pricing page, and the turn record keeps the price version it used. No billing API calls. Lands in the Context (registry) and Turn record v2 items.
+
+Orchestrator observation (for Turn record v2): in the live hero test (traces `0908fd6bb978ce23837b1b5d2559b545`, `e20ce2b9a87b5e8831377feca36e444d`) the `betterlook.turn` observation had an empty output in Langfuse, so the turn record, including sandbox CPU, can't be read back from the v2 observations API (Langfuse removed `GET /api/public/traces` on 2026-11-16). The turn record must land somewhere it can be read back. Turn-two cache reads were 0 on every step (no breakpoints yet, a prefix of about 1k tokens). That matches the audit risk, and the Request shape and caching item measures it.
 
 ## Round log
 
+- Round 2b (2026-11-18): recorded founder answers Q1-Q4 and the orchestrator's Langfuse observation; built the `.md` task reader with an inline-string test. BLOCKED on the task file.
 - Round 2 (2026-11-18): merged `betterlook` (`a106f753` .env.example names). Wrote the audit table. Baseline BLOCKED: task file missing (Q1), format (Q2), OpenAI eval key and price source (Q4).
 - Round 1 (2026-11-18): merged `betterlook` (fast-forward to `60528b79`, includes S01). Created this file. Stopped as the loop prompt says.
