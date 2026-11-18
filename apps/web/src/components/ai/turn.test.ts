@@ -1,6 +1,6 @@
 import {expect, test} from 'bun:test';
 import type {AgentMessage} from '@/lib/agent/types';
-import {uniqueById, unshownApprovals} from './turn';
+import {changedFiles, uniqueById, unshownApprovals} from './turn';
 
 const approvalPart = {
   type: 'tool-write_file',
@@ -28,4 +28,10 @@ test('a message that arrives twice under one id renders once, as its latest copy
   const user: AgentMessage = {id: 'msg_u', role: 'user', parts: [{type: 'text', text: 'hi'}]};
   const latest = {...first, parts: [{type: 'text' as const, text: 'new'}]};
   expect(uniqueById([user, first, latest])).toEqual([user, latest]);
+});
+
+test('only a turn whose diff is non-empty changed files', () => {
+  expect(changedFiles(assistant([{type: 'data-diff', id: 'diff', data: {diff: 'diff --git a/x b/x', filesTouched: ['x']}}]))).toBe(true);
+  expect(changedFiles(assistant([{type: 'data-diff', id: 'diff', data: {diff: '', filesTouched: []}}]))).toBe(false);
+  expect(changedFiles(assistant([{type: 'text', text: 'No changes made.'}]))).toBe(false);
 });

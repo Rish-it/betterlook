@@ -1,5 +1,5 @@
 import {Chat} from '@ai-sdk/react';
-import {DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses} from 'ai';
+import {type ChatInit, DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses} from 'ai';
 import type {ChatGPTStatus} from '@/lib/auth/status';
 import {providerOf} from './models';
 import type {AgentMessage, ProviderCredential, ProviderId} from './types';
@@ -24,13 +24,16 @@ export function createAgentChat({
   getCredential,
   getSandboxId,
   messages,
+  onFinish,
 }: {
   getCredential: (provider: ProviderId) => ProviderCredential | null;
   getSandboxId: () => string | null;
   messages?: AgentMessage[];
+  onFinish?: ChatInit<AgentMessage>['onFinish'];
 }) {
   return new Chat<AgentMessage>({
     messages,
+    onFinish,
     transport: new DefaultChatTransport<AgentMessage>({
       api: '/api/chat',
       prepareSendMessagesRequest: ({id, messages, body, trigger, messageId}) => {

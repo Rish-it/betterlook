@@ -26,7 +26,7 @@ import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
 import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
-import {unshownApprovals} from '@/components/ai/turn';
+import {changedFiles, unshownApprovals} from '@/components/ai/turn';
 
 const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
@@ -136,7 +136,15 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const initialModelValue = MODELS.some(m => m.id === initialModel) ? initialModel : MODELS[0].id;
   const [model, setModel] = useState(initialModelValue);
   // Owned here so StrictMode's simulated unmount cannot stop the first send.
-  const [chat] = useState(() => createAgentChat({getCredential, getSandboxId: () => readStored(SANDBOX_KEY)}));
+  const [chat] = useState(() =>
+    createAgentChat({
+      getCredential,
+      getSandboxId: () => readStored(SANDBOX_KEY),
+      onFinish: ({message}) => {
+        if (changedFiles(message)) refresh();
+      },
+    }),
+  );
   const {messages, setMessages, sendMessage, status, stop, error} = useChat({chat});
   const [preview, setPreview] = useState<Preview>({url: PREVIEW_URL});
   // The first prompt waits for the sandbox, so its request carries the sandbox id.
