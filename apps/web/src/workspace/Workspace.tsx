@@ -1,8 +1,11 @@
 'use client';
 
-import {useRef, useState, useSyncExternalStore, type SVGProps} from 'react';
+import {useEffect, useRef, useState, useSyncExternalStore, type SVGProps} from 'react';
+import {Chat, useChat} from '@ai-sdk/react';
+import {DefaultChatTransport, type UIMessage} from 'ai';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
+import {Button} from '@astryxdesign/core/Button';
 import {
   ChatLayout,
   ChatMessage,
@@ -22,15 +25,21 @@ import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/token
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/composer/models';
+import type {ProviderCredential} from '@/lib/agent/types';
 
 const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
-const MOCK_REPLY = 'Got it. Edits are not connected yet, so this is a placeholder reply and nothing in your app changed.';
 const NARROW = '@media (max-width: 640px)';
 
 const noopSubscribe = () => () => {};
 
-type Message = {id: number; sender: 'user' | 'assistant'; text: string; model?: string};
+// Stub until AUTH's lib/auth/client.ts lands on betterlook; replace with its import.
+const getCredential = (): ProviderCredential | null => null;
+
+type AgentMessage = UIMessage<{model: string}>;
+const transport = new DefaultChatTransport<AgentMessage>({api: '/api/chat', body: () => ({credential: getCredential()})});
+
+const textOf = (m: UIMessage) => m.parts.map(p => (p.type === 'text' ? p.text : '')).join('');
 type View = 'chat' | 'preview';
 
 const styles = stylex.create({
@@ -109,10 +118,10 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   });
   const initialModelValue = MODELS.some(m => m.value === initialModel) ? initialModel : MODELS[0].value;
   const [model, setModel] = useState(initialModelValue);
-  const [messages, setMessages] = useState<Message[]>([
-    {id: 0, sender: 'user', text: prompt, model: initialModelValue},
-    {id: 1, sender: 'assistant', text: MOCK_REPLY},
-  ]);
+  // Owned here so StrictMode's simulated unmount cannot stop the first send.
+  const [chat] = useState(() => new Chat<AgentMessage>({transport}));
+  const {messages, sendMessage, status, stop, error} = useChat({chat});
+  const isBusy = status === 'submitted' || status === 'streaming';
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
@@ -120,12 +129,16 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const isHydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   const send = (text: string, sentModel: string) => {
-    setMessages(list => [
-      ...list,
-      {id: list.length, sender: 'user', text, model: sentModel},
-      {id: list.length + 1, sender: 'assistant', text: MOCK_REPLY},
-    ]);
+    if (isBusy) return;
+    sendMessage({text, metadata: {model: sentModel}}, {body: {model: sentModel}});
   };
+
+  const sentInitial = useRef(false);
+  useEffect(() => {
+    if (sentInitial.current) return;
+    sentInitial.current = true;
+    sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+  }, [prompt, initialModelValue, sendMessage]);
 
   const refresh = () => {
     setIsFrameLoading(true);
@@ -161,20 +174,30 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
               }>
               <ChatMessageList>
                 {messages.map(m => (
-                  <ChatMessage key={m.id} sender={m.sender}>
+                  <ChatMessage key={m.id} sender={m.role === 'user' ? 'user' : 'assistant'}>
                     <ChatMessageBubble
-                      variant={m.sender === 'assistant' ? 'ghost' : 'filled'}
+                      variant={m.role === 'user' ? 'filled' : 'ghost'}
                       metadata={
-                        m.model && (
+                        m.metadata?.model && (
                           <Text type="supporting" color="secondary">
-                            {MODELS.find(x => x.value === m.model)?.label}
+                            {MODELS.find(x => x.value === m.metadata?.model)?.label}
                           </Text>
                         )
                       }>
-                      {m.text}
+                      {textOf(m)}
                     </ChatMessageBubble>
                   </ChatMessage>
                 ))}
+                {error && (
+                  <ChatMessage sender="assistant">
+                    <ChatMessageBubble variant="ghost">{error.message}</ChatMessageBubble>
+                  </ChatMessage>
+                )}
+                {isBusy && (
+                  <ChatMessage sender="assistant">
+                    <Button label="Stop" variant="secondary" size="sm" onClick={() => stop()} />
+                  </ChatMessage>
+                )}
               </ChatMessageList>
             </ChatLayout>
           </section>
