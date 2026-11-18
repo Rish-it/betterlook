@@ -640,7 +640,7 @@ export function e7PreCheck(input: {finalMessage: string | null; verifyStatus: 'p
 export function scoreE7(pre: Result, judge: {verdict: 'PASS' | 'FAIL'; reason: string} | null, judgeRequired: boolean): Result {
   if (pre.outcome === 'FAIL') return {...pre, check: 'E7', subrules: [pre]};
   if (pre.outcome === 'NOT_EVALUATED') return {...pre, check: 'E7', subrules: [pre]};
-  if (!judge) return result('E7', 'E7', 'NOT_EVALUATED', judgeRequired ? 'The required judge verdict is missing or invalid.' : 'Pre-check only; the judge did not run for this turn.');
+  if (!judge) return {...result('E7', 'E7', 'NOT_EVALUATED', judgeRequired ? 'The required judge verdict is missing or invalid.' : 'Pre-check only; the judge did not run for this turn.'), subrules: [pre]};
   return {eval: 'E7', check: 'E7', outcome: judge.verdict, reason: `Judge: ${judge.reason}`, subrules: [pre]};
 }
 
@@ -714,7 +714,7 @@ export interface ScoreRecord {
   metadata: ScoreMeta & {eval_id: EvalId; check: string; evaluator_version: string; outcome: Outcome; severity?: Severity; same_family?: boolean};
 }
 
-// One record per aggregate plus one per E4 subrule. Only PASS/FAIL carry a boolean value; the rest keep their reason without one.
+// One record per aggregate plus one per E4 subrule and the E7 pre-check, kept distinct from the full E7. Only PASS/FAIL carry a boolean value; the rest keep their reason without one.
 export function scoreRecords(results: (Result & {severity?: Severity})[], meta: ScoreMeta, extra: {same_family?: boolean} = {}): ScoreRecord[] {
   const one = (r: Result & {severity?: Severity}, name: string): ScoreRecord => ({
     name,
@@ -731,5 +731,9 @@ export function scoreRecords(results: (Result & {severity?: Severity})[], meta: 
       ...(r.eval === 'E7' && extra.same_family !== undefined ? {same_family: extra.same_family} : {}),
     },
   });
-  return results.flatMap(r => [one(r, r.eval), ...(r.eval === 'E4' ? (r.subrules ?? []).map(s => one(s, s.check)) : [])]);
+  return results.flatMap(r => [
+    one(r, r.eval),
+    ...(r.eval === 'E4' ? (r.subrules ?? []).map(s => one(s, s.check)) : []),
+    ...(r.eval === 'E7' ? (r.subrules ?? []).map(s => one(s, 'E7 pre-check')) : []),
+  ]);
 }

@@ -1,4 +1,5 @@
 import type {FinishReason, UIMessage} from 'ai';
+import type {Result} from '../evals/checks';
 
 export type ProviderId = 'openai' | 'anthropic';
 
@@ -85,6 +86,7 @@ export interface TurnRecord {
   lengthStops: number;
   projectContextHash: string | null;
   finalMessage: string | null;
+  evals: {results: Result[]; addedVerifyMs: number; error?: string} | null;
   stepLimitReached: boolean;
   status: TurnStatus;
   error?: string;

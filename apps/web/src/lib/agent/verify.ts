@@ -24,14 +24,15 @@ export function runtimeErrors(exitCode: number, output: string): Omit<VerifyChec
   return errors.length ? {status: 'failed', errors} : {status: 'passed', errors: []};
 }
 
-export async function verifyProject(project: Project): Promise<VerifyResult> {
+// `hook` is the eval collector module; it runs on the page the runtime check already loaded.
+export async function verifyProject(project: Project, hook?: string): Promise<VerifyResult> {
   const typecheck = await script(project, 'typecheck');
   const build = await script(project, 'build');
   const runtime =
     build.status === 'failed'
       ? {name: 'runtime' as const, status: 'skipped' as const, errors: [], durationMs: 0}
       : await timed('runtime', async () => {
-          const {exitCode, output} = await project.run('node', [CHECKER_SCRIPT, `http://localhost:${PREVIEW_PORT}`]);
+          const {exitCode, output} = await project.run('node', [CHECKER_SCRIPT, `http://localhost:${PREVIEW_PORT}`, ...(hook ? ['', hook] : [])]);
           return runtimeErrors(exitCode, output);
         });
   const checks = [typecheck, build, runtime];

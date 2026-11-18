@@ -1,9 +1,11 @@
 import {convertToModelMessages, createUIMessageStreamResponse} from 'ai';
+import {after} from 'next/server';
 import {missingKey} from '@/lib/agent/errors';
 import {languageModel, parseCredential} from '@/lib/agent/model';
 import {MODELS} from '@/lib/agent/models';
 import {runAgent} from '@/lib/agent/run';
 import type {AgentMessage} from '@/lib/agent/types';
+import {LIVE_JOB, publishLive} from '@/lib/evals/turn';
 import {getServerCredential} from '@/lib/auth/server';
 import type {Project} from '@/lib/sandbox/project';
 import {openProject, sandboxConfigured} from '@/lib/sandbox/sandbox';
@@ -25,11 +27,14 @@ export async function POST(req: Request) {
     }
   }
 
-  const {stream} = runAgent({
+  const {stream, turn} = runAgent({
     model: languageModel(body.model, credential),
     messages: await convertToModelMessages(body.messages),
     project,
     abortSignal: req.signal,
+    evals: project ? {job: LIVE_JOB, live: true} : undefined,
   });
+  // Eval scores and the sampled judge run after the response; the designer never waits on them.
+  after(() => turn.then(record => publishLive(record)).catch(error => console.error('[evals] live publish failed:', error instanceof Error ? error.message : 'unknown')));
   return createUIMessageStreamResponse({stream});
 }
