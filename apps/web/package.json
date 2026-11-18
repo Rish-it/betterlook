@@ -6,7 +6,7 @@
     "build": "next build",
     "start": "next start --port 3100",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --no-env-file",
     "agent:run": "bun build scripts/agent-run.ts --target=node --packages=external --outfile=node_modules/.cache/agent-run.mjs && node --env-file-if-exists=.env node_modules/.cache/agent-run.mjs"
   },
   "dependencies": {
