@@ -35,7 +35,7 @@ const ask = (text = 'make it blue') => [{role: 'user' as const, content: text}];
 
 async function expectChatStillWorks(p = project().project) {
   const {record, message} = await runTurn({model: new MockLanguageModelV4({doStream: [textStep('Still here.')]}), messages: ask('hello again'), project: p});
-  expect(record.status).toBe('passed');
+  expect(record.status).toBe('no-changes');
   expect(message.parts.find(part => part.type === 'text')).toMatchObject({text: 'Still here.'});
 }
 
@@ -150,13 +150,13 @@ test('denied tool: the data part carries a readable reason and the turn carries 
   const model = new MockLanguageModelV4({doStream: [toolStep([['d1', 'read_file', {path: '/etc/passwd'}]]), textStep('I cannot read files outside the project.')]});
   const {message, record} = await runTurn({model, messages: ask('read /etc/passwd'), project: project().project});
   expect(message.parts.find(p => p.type === 'data-denied')).toMatchObject({data: {message: '/etc/passwd is outside the project folder.'}});
-  expect(record.status).toBe('passed');
+  expect(record.status).toBe('no-changes');
   await expectChatStillWorks();
 });
 
 test('failed verify: status failed with a readable notice and restore offered via the checkpoint', async () => {
   const t = project((cmd, args) => (args.includes('typecheck') ? {exitCode: 2, output: 'error TS2322'} : cmd === 'node' ? {exitCode: 0, output: '[]'} : {exitCode: 0, output: ''}));
-  const model = new MockLanguageModelV4({doStream: [textStep('Done.'), textStep('Still broken.')]});
+  const model = new MockLanguageModelV4({doStream: [toolStep([['e1', 'edit_file', {path: 'src/App.tsx', oldString: 'Hi', newString: 'Hello'}]]), textStep('Done.'), textStep('Still broken.')]});
   const {message, record} = await runTurn({model, messages: ask(), project: t.project});
   expect(record.status).toBe('failed');
   expect(message.metadata).toMatchObject({status: 'failed', notice: VERIFY_FAILED});
@@ -169,7 +169,7 @@ test('step limit: the turn says it stopped early and how to continue', async () 
   const model = new MockLanguageModelV4({doStream: async () => toolStep([[`l${n++}`, 'list_files', {}]])});
   const {message, record} = await runTurn({model, messages: ask('keep looking'), project: project().project});
   expect(model.doStreamCalls.length).toBe(AGENT_CONFIG.maxSteps);
-  expect(record).toMatchObject({stepLimitReached: true, status: 'passed'});
+  expect(record).toMatchObject({stepLimitReached: true, status: 'no-changes'});
   expect(message.metadata).toMatchObject({notice: STEP_LIMIT});
   await expectChatStillWorks();
 });

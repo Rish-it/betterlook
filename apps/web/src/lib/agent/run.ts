@@ -15,7 +15,7 @@ import {
 import type {Project} from '../sandbox/project';
 import {commitTurn} from './checkpoint';
 import {AGENT_CONFIG} from './config';
-import {errorStatus, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED} from './errors';
+import {errorStatus, NO_CHANGES, REFUSED, sandboxMessage, STEP_LIMIT, UNVERIFIED, userMessage, VERIFY_FAILED} from './errors';
 import {logEvent} from './events';
 import {checkPolicy} from './policy';
 import {REPAIR_PROMPT, SYSTEM_PROMPT} from './system-prompt';
@@ -42,6 +42,7 @@ export function noticeFor(record: TurnRecord): string | undefined {
   if (record.status === 'failed') return VERIFY_FAILED;
   if (record.status === 'unverified') return UNVERIFIED;
   if (record.stepLimitReached && record.status !== 'stopped') return STEP_LIMIT;
+  if (record.status === 'no-changes') return NO_CHANGES;
   return undefined;
 }
 
@@ -237,6 +238,7 @@ export function runAgent({
         if (!project) return end({status: 'passed'});
 
         const saved = await commitTurn(project, record.id);
+        if (!saved) return end({status: 'no-changes'});
         writer.write({type: 'data-checkpoint', id: 'checkpoint', data: saved.checkpoint});
         writer.write({type: 'data-diff', id: 'diff', data: saved.diff});
         const verify = await verifyProject(project);
@@ -247,7 +249,7 @@ export function runAgent({
         await pipe(toUIMessageStream<ToolSet, AgentMessage>({stream: repair.result.stream, sendStart: false, sendFinish: false, onError: userMessage}));
         const repairOutcome = await repair.outcome;
         if (!settled(repairOutcome)) return;
-        const repaired = await commitTurn(project, record.id, saved.checkpoint.parentId);
+        const repaired = (await commitTurn(project, record.id, saved.checkpoint.parentId)) ?? saved;
         writer.write({type: 'data-checkpoint', id: 'checkpoint', data: repaired.checkpoint});
         writer.write({type: 'data-diff', id: 'diff', data: repaired.diff});
         const repairVerify = await verifyProject(project);

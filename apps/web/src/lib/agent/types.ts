@@ -63,7 +63,7 @@ export interface SandboxUsage {
   durationMs: number | null;
 }
 
-export type TurnStatus = 'running' | 'awaiting-approval' | 'passed' | 'unverified' | 'failed' | 'stopped' | 'error';
+export type TurnStatus = 'running' | 'awaiting-approval' | 'passed' | 'no-changes' | 'unverified' | 'failed' | 'stopped' | 'error';
 
 export interface TurnRecord {
   id: string;
