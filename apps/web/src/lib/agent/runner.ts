@@ -3,6 +3,7 @@ import {join} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import type {LanguageModel} from 'ai';
 import {parseExpectation} from '../evals/checks';
+import {EVAL_IDS} from '../evals/report';
 import type {Project} from '../sandbox/project';
 import {CHECKER_DIR, CHECKER_SCRIPT} from '../sandbox/runtime-check';
 import {PREVIEW_PORT} from '../sandbox/starter';
@@ -53,7 +54,6 @@ export function parseTasks(value: unknown): Task[] {
 
 const STARTERS = ['default'];
 
-const EVAL_IDS = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8'];
 const commaList = (value: string) => value.split(',').map(v => v.trim()).filter(Boolean);
 
 // The founder's Markdown task format: one "## <task id>" section per task with "prompt:", "starter:" and "notes:" lines,
@@ -91,7 +91,7 @@ export function parseTaskMarkdown(text: string): Task[] {
       const applies = field('applies');
       if (applies !== undefined) {
         task.applies = commaList(applies);
-        const unknown = (task.applies as string[]).filter(e => !EVAL_IDS.includes(e));
+        const unknown = (task.applies as string[]).filter(e => !(EVAL_IDS as string[]).includes(e));
         if (unknown.length) throw new Error(`Task ${id} applies unknown evals: ${unknown.join(', ')}.`);
       }
       const target = field('target');

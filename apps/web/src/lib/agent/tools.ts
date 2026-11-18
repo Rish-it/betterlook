@@ -54,7 +54,7 @@ type Input = {path?: string; query?: string; oldString?: string; newString?: str
 const clip = (text: string) =>
   text.length > AGENT_CONFIG.maxToolOutputChars ? `${text.slice(0, AGENT_CONFIG.maxToolOutputChars)}\n[truncated]` : text;
 
-const countOf = (text: string, part: string) => (part ? text.split(part).length - 1 : 0);
+export const countOf = (text: string, part: string) => (part ? text.split(part).length - 1 : 0);
 
 export function proposedDiff(path: string, before: string | null, after: string) {
   const lines = (text: string, sign: string) => (text ? text.split('\n').map(l => `${sign}${l}`) : []);
