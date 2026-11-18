@@ -13,12 +13,27 @@ import {maskSecrets} from './trace';
 import type {ProviderCredential, ProviderId, SandboxUsage, TurnRecord, TurnStatus} from './types';
 
 export type Task = {id: string; prompt: string} & Record<string, unknown>;
-export type RunSummary = {taskId: string; run: number; status: TurnStatus; attempts: number; dir: string};
+export type RunSummary = {taskId: string; run: number; status: TurnStatus; attempts: number; dir: string; evaluation?: unknown};
+
+export interface RunContext {
+  task: Task;
+  run: number;
+  project: Project;
+  record: TurnRecord;
+  before: Uint8Array | null;
+  after: Uint8Array | null;
+}
 
 type Deps = {
   model: () => Exclude<LanguageModel, string>;
   project: () => Promise<Project>;
-  capture: (project: Project) => Promise<Uint8Array | null>;
+  capture: (project: Project, task: Task, phase: 'before' | 'after') => Promise<Uint8Array | null>;
+  // Extra runAgent options for a task (the eval collector job, trace attributes).
+  agent?: (task: Task, run: number) => Omit<Parameters<typeof runAgent>[0], 'model' | 'messages' | 'project'>;
+  // Scores a finished run while its sandbox is still up; the result is written to evals.json.
+  evaluate?: (context: RunContext) => Promise<unknown>;
+  // Checked before each new job, e.g. a spend cap; false stops scheduling.
+  proceed?: () => boolean;
   sleep?: (ms: number) => Promise<unknown>;
   log?: (line: string) => void;
 };
@@ -112,12 +127,16 @@ async function runOnce(task: Task, run: number, outDir: string, deps: Required<D
     let before: Uint8Array | null;
     let after: Uint8Array | null = null;
     let usage: SandboxUsage | null = null;
+    let evaluation: unknown;
     try {
-      before = await deps.capture(project);
-      const {stream, turn} = runAgent({model: deps.model(), messages: [{role: 'user', content: task.prompt}], project, keepSandbox: true});
+      before = await deps.capture(project, task, 'before');
+      const {stream, turn} = runAgent({...deps.agent(task, run), model: deps.model(), messages: [{role: 'user', content: task.prompt}], project, keepSandbox: true});
       for await (const _ of stream);
       record = await turn;
-      if (record.error !== RATE_LIMITED) after = await deps.capture(project);
+      if (record.error !== RATE_LIMITED) {
+        after = await deps.capture(project, task, 'after');
+        evaluation = await deps.evaluate?.({task, run, project, record, before, after}).catch((error: unknown) => ({error: maskSecrets(error instanceof Error ? error.message : String(error))}));
+      }
     } finally {
       usage = (await project.stop?.().catch(() => null)) ?? null;
     }
@@ -137,8 +156,9 @@ async function runOnce(task: Task, run: number, outDir: string, deps: Required<D
     await writeFile(join(dir, 'verify.json'), json({verify: record.verify, repairAttempted: record.repairAttempted, repairVerify: record.repairVerify}));
     if (before) await writeFile(join(dir, 'before.png'), before);
     if (after) await writeFile(join(dir, 'after.png'), after);
+    if (evaluation !== undefined) await writeFile(join(dir, 'evals.json'), json(evaluation));
     deps.log(`${task.id} run ${run}: ${record.status}, sandbox ${JSON.stringify(record.sandbox)}`);
-    return {taskId: task.id, run, status: record.status, attempts: attempt, dir};
+    return {taskId: task.id, run, status: record.status, attempts: attempt, dir, ...(evaluation === undefined ? {} : {evaluation})};
   }
 }
 
@@ -149,13 +169,13 @@ export async function runTasks({
   concurrency = RUNNER_CONFIG.concurrency,
   ...deps
 }: {tasks: Task[]; runs: number; outDir: string; concurrency?: number} & Deps): Promise<RunSummary[]> {
-  const all: Required<Deps> = {sleep: delay, log: () => {}, ...deps};
+  const all: Required<Deps> = {sleep: delay, log: () => {}, agent: () => ({}), evaluate: async () => undefined, proceed: () => true, ...deps};
   const jobs = tasks.flatMap(task => Array.from({length: runs}, (_, i) => ({task, run: i + 1})));
   const results: RunSummary[] = [];
   let next = 0;
   let paused = false;
   const worker = async () => {
-    while (!paused && next < jobs.length) {
+    while (!paused && next < jobs.length && all.proceed()) {
       const {task, run} = jobs[next++];
       try {
         results.push(await runOnce(task, run, outDir, all));
