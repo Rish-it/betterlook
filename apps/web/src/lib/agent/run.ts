@@ -157,7 +157,7 @@ export function runAgent({
             // Claude Sonnet 5.5 400s on non-default sampling, forced toolChoice and disabled thinking, so none are set.
             providerOptions: {
               openai: {store: false, ...(AGENT_CONFIG.promptCachePerProject && project ? {promptCacheKey: project.id} : {})},
-              anthropic: {fallbacks: 'default'},
+              anthropic: {fallbacks: 'default', effort: AGENT_CONFIG.effort, thinking: {type: 'adaptive', display: AGENT_CONFIG.thinkingDisplay}},
             },
             tools: project ? createTools(project, record.toolCalls) : undefined,
             toolApproval: async ({toolCall}) => {

@@ -5,7 +5,7 @@ import {MockLanguageModelV4} from 'ai/test';
 import {AGENT_CONFIG} from './config';
 import {languageModel, parseCredential} from './model';
 import {MODELS, providerOf} from './models';
-import {runTurn} from './test-project';
+import {runTurn, tempProject, textStep, toolStep} from './test-project';
 
 const usage = {
   inputTokens: {total: 3, noCache: 3, cacheRead: undefined, cacheWrite: undefined},
@@ -35,7 +35,7 @@ test('streams the model reply with the configured limits', async () => {
   expect(record.status).toBe('passed');
   const call = model.doStreamCalls[0];
   expect(call.maxOutputTokens).toBe(AGENT_CONFIG.maxOutputTokens);
-  expect(call.providerOptions).toEqual({openai: {store: false}, anthropic: {fallbacks: 'default'}});
+  expect(call.providerOptions).toEqual({openai: {store: false}, anthropic: {fallbacks: 'default', effort: 'medium', thinking: {type: 'adaptive', display: 'summarized'}}});
   expect(call.temperature).toBeUndefined();
   expect(call.toolChoice).toEqual({type: 'auto'});
 });
@@ -89,4 +89,19 @@ test('stops at the configured step limit when the model keeps calling tools', as
   });
   await runTurn({model, messages: [{role: 'user', content: 'hi'}]});
   expect(model.doStreamCalls.length).toBe(AGENT_CONFIG.maxSteps);
+});
+
+test('every model call sets the configured effort and summarized thinking, repair included', async () => {
+  const t = tempProject({'src/App.tsx': '<h1>Hi</h1>\n'}, (_cmd, args) => (args.includes('typecheck') ? {exitCode: 1, output: 'TS1'} : {exitCode: 0, output: '[]'}));
+  const edit = toolStep([['e1', 'edit_file', {path: 'src/App.tsx', oldString: 'Hi', newString: 'Hello'}]]);
+  const model = new MockLanguageModelV4({doStream: [edit, textStep('Done.'), textStep('Tried.')]});
+  try {
+    await runTurn({model, messages: [{role: 'user', content: 'hi'}], project: t.project});
+  } finally {
+    t.cleanup();
+  }
+  expect(model.doStreamCalls.length).toBe(3);
+  for (const call of model.doStreamCalls) {
+    expect(call.providerOptions?.anthropic).toEqual({fallbacks: 'default', effort: 'medium', thinking: {type: 'adaptive', display: 'summarized'}});
+  }
 });
