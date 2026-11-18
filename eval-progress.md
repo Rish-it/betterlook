@@ -6,7 +6,7 @@ Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `eval
 
 - [x] 1. Inventory: read evals/EVALS.md, sample.md, the Vite + React starter, agent:run, verify, existing tracing and package scripts. Write a short map of where each part of the spec plugs in. No edits yet.
 - [x] 2. Starter: update it to Section 0 (Geist Sans, Geist Mono and Geist Pixel Square faces actually loaded, [data-section="hero"] with h1, one-line intro and primary button, keyword spans, monochrome, borderless, typography, geometry, press motion, html background), add DESIGN.md, and wire DESIGN.md into the agent's context. The starter itself must pass E2–E4 on its own.
-- [ ] 3. Check library: one shared TypeScript library for E1–E8 per the spec, with PASS / FAIL / NOT_EVALUATED / NOT_APPLICABLE, one-line evidence-based reasons, E4 subrules E4a–E4k, E8 severities, and the metadata fields the scoring contract lists. Unit tests on the spec's positive and negative fixtures for every eval, plus boundary cases for every threshold.
+- [x] 3. Check library: one shared TypeScript library for E1–E8 per the spec, with PASS / FAIL / NOT_EVALUATED / NOT_APPLICABLE, one-line evidence-based reasons, E4 subrules E4a–E4k, E8 severities, and the metadata fields the scoring contract lists. Unit tests on the spec's positive and negative fixtures for every eval, plus boundary cases for every threshold.
 - [ ] 4. Task file: write evals/tasks/v1.md with exactly the 12 tasks in Section 9, in sample.md's syntax, with selectors confirmed against the actual starter and exactly 4 tagged regression. Show me the complete file in this progress log, then continue without waiting. Freeze it and record its SHA-256 as the taskset hash.
 - [ ] 5. Trigger A: post-turn checks inside verify, reusing its browser session, scores attached to the turn's Langfuse trace, added_verify_ms measured, and the 5% asynchronous E7 judge sample enqueued without blocking.
 - [ ] 6. Trigger B: bun run eval --tasks --runs --model on top of agent:run, with a fresh isolated starter per task and trial, the Langfuse dataset created or updated from the frozen tasks, one experiment per model, trace-linked BOOLEAN scores, config SHA-256, all the per-run fields Section 11 lists, concurrency capped at 3 sandboxes, backoff on rate limits, and nonzero exit on any E8 high-severity hit. Sanitize records and scan them for secret or canary matches before publishing.
@@ -65,6 +65,22 @@ E4: PASS — All applicable visual-system subrules pass.   (E4a–E4k all PASS; 
 Negative control on the same page (blue CTA, 2px ring, `h2` without balance, Mono body copy, 18px bordered icon button): E3 FAIL, E4a/E4b/E4c/E4d/E4j/E4k FAIL, as expected; reverted.
 Starter `npm run typecheck` OK, `npm run build` OK (all three woff2 bundled). `npx react-doctor@latest .` on the starter: 100/100, no issues.
 `bun test` ×2: 101 pass, 0 fail. `bun run typecheck` ×2: clean.
+
+## Item 3: check library
+
+- `apps/web/src/lib/evals/checks.ts`: `scoreE1`…`scoreE8`, `e7PreCheck`, `aggregate` (FAIL beats NOT_EVALUATED; NOT_APPLICABLE never passes), `parseExpectation` (text, count, visible, order, style, click; unknown types/keys rejected), E2 `outsideAllowed` (canonical-path and glob check), `pixelDiff` (pixelmatch 0.1 over the shared region) + `outsideRatio` (8px padding, ≤ 0.001), E4a–E4k with measured values per subrule, E8 `Severity` (high / medium / false refusal / attempted outside writes), `scoreRecords` (task_id, run_id, eval_id, evaluator_version, check, timestamp, model_id, config_hash, evidence_ref; value 1/0 only for PASS/FAIL).
+- `apps/web/src/lib/evals/collect.ts`: the in-page collector and the sandbox hook module (fonts ready, full-page screenshot with animations disabled, DOM/style collection, mouse-press and reduced-motion measurements, then expectations). `runtime-check.ts` `CHECKER_SOURCE` takes an optional third argument, a hook module that receives the page it already loaded.
+- New dev dependencies: `pixelmatch` 7.1.0 (named by §E2), `pngjs` 7.0.0 + `@types/pngjs` (PNG decode; Bun and the platform have none).
+- Starter: pricing plans sit in a `.plans` row so a second plan can be added beside the first without moving anything else.
+- Fixture: `lib/evals/fixtures/starter-page.json` is the real starter snapshot from headless Chromium (page text stripped).
+
+Proof:
+```
+bun test src/lib/evals   →  51 pass, 0 fail (143 expect() calls)
+bun test (run 1)         →  152 pass, 0 fail      bun run typecheck → clean
+bun test (run 2)         →  152 pass, 0 fail      bun run typecheck → clean
+```
+Positive and negative fixtures for every eval; boundary cases: E2 ratio 0.001/0.001001 and 8px padding; E4a chroma at the last blue value ≤ 0.02 vs the next; E4c spread 1/1.5px, opacity 0.10/0.11 (and element opacity); E4e −0.24px vs −0.216px at 24px, 23.9px exempt; E4h inner 7 vs 6.5 (±1px); E4j 24/23.9 and 32/31; E4k scale 0.95/0.98/0.949/0.981, 100/150/99/151ms.
 
 ## Round log
 
