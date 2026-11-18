@@ -10,6 +10,7 @@ module.exports = {
         runtimeInjection: false,
         enableInlinedConditionalMerge: true,
         treeshakeCompensation: true,
+        classNamePrefix: 'p',
         aliases: {'@/*': [path.join(__dirname, 'src', '*')]},
         unstable_moduleResolution: {type: 'commonJS'},
       },

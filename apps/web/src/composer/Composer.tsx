@@ -12,7 +12,11 @@ const styles = stylex.create({
   borderless: {
     borderColor: 'transparent',
     boxShadow: 'none',
-    backgroundColor: 'var(--color-background-muted)',
+    outlineStyle: 'none',
+    backgroundColor: {
+      default: 'var(--color-background-muted)',
+      ':focus-within': 'color-mix(in srgb, var(--color-background-muted), var(--color-text-primary) 5%)',
+    },
   },
 });
 
@@ -20,10 +24,17 @@ type ComposerProps = {
   onSubmit(text: string, model: string): void;
   placeholder?: string;
   autoFocus?: boolean;
+  model?: string;
+  onModelChange?(model: string): void;
 };
 
-export function Composer({onSubmit, placeholder, autoFocus}: ComposerProps) {
-  const [model, setModel] = useState(MODELS[0].value);
+export function Composer({onSubmit, placeholder, autoFocus, model: controlledModel, onModelChange}: ComposerProps) {
+  const [ownModel, setOwnModel] = useState(MODELS[0].value);
+  const model = controlledModel ?? ownModel;
+  const pickModel = (next: string) => {
+    if (controlledModel === undefined) setOwnModel(next);
+    onModelChange?.(next);
+  };
   const inputRef = useRef<ChatComposerInputHandle>(null);
 
   useEffect(() => {
@@ -39,7 +50,7 @@ export function Composer({onSubmit, placeholder, autoFocus}: ComposerProps) {
       footerActions={
         <>
           <IconButton label="Attach file" variant="ghost" icon={<Icon icon="upload" />} />
-          <ModelPicker value={model} onChange={setModel} />
+          <ModelPicker value={model} onChange={pickModel} />
         </>
       }
     />

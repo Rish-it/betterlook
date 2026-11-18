@@ -3,6 +3,7 @@
 ## Shared contract additions
 
 - Borderless (founder requirement, every UI item): no visible borders, outlines or divider lines on page, composer, top bar, chat column, message bubbles, preview pane or preview toolbar. Separate regions with spacing and subtle Astryx surface/background token differences (light and dark). Resizable divider shows no line at rest; handle only on hover, drag and keyboard focus. Keyboard focus rings stay visible. Prefer Astryx variants/props that drop borders; otherwise StyleX override through the component's style prop, never global CSS. Checked in every UI screenshot.
+- Composer controlled model (orchestrator decision): `Composer` takes optional `model?: string` and `onModelChange?(model: string): void`. With `model` given it is controlled: ModelPicker shows that value, a pick calls `onModelChange`, and `onSubmit(text, model)` passes the current value. Without it Composer keeps its own state as before; the landing screen does not pass it.
 
 ## Checklist
 
@@ -36,5 +37,13 @@
   Commit: `0a195121`. `page.tsx` pushes `/workspace?${new URLSearchParams({prompt, model})}` via `next/navigation`.
   Checked in Chrome: Shift+Enter adds a newline without sending; Enter sends `"Make the header blue\nand bold"` with `model=gpt-5` after picking GPT-5; clicking Send carries `&`, `%` and `?` intact (`URLSearchParams` encoding).
   Screenshots: `.screenshots/04-send-enter-url.png`, `.screenshots/04-send-click-url.png` (URL banner injected for the shot; `/workspace` 404s on this branch as expected).
-- [ ] Polish: empty, narrow-window (about 400px) and keyboard states of the landing screen look and work right.
+- [x] Polish: empty, narrow-window (about 400px) and keyboard states of the landing screen look and work right.
   Orchestrator review of f284d682: focused composer must not show a ring around the whole box. Show input focus by a slight background tone lift on the composer instead. Keep focus-visible rings on attach, model picker and send. Screenshot both themes.
+  Orchestrator: set `devIndicators: false` in `apps/web/next.config.mjs` (dev badge overlaps the composer in screenshots).
+  Commit: `a4163737`.
+  Root cause of missing focus rings: app StyleX emitted the same atomic class names as Astryx (`x1t137rt` = `outline-style:none`) in a later layer, overriding Astryx's `:focus-visible` rule. `classNamePrefix: 'p'` in `babel.config.js` (as Astryx's example does) separates them.
+  Composer: no ring or border when focused; `:focus-within` lifts the fill 5% toward text colour (light 241 to 229, dark 27 to 38). Attach, model picker and send show the Astryx focus-visible ring on Tab. `devIndicators: false` hides the Next badge.
+  Checked at 1280 and 400 px, light and dark: no horizontal scroll at 400 px; Enter on empty or whitespace stays on `/` with Send disabled; Tab order Message, Attach, Model, Send; Enter on Send navigates.
+  Screenshots: `.screenshots/05-{wide,narrow}-{light,dark}-{focused-empty,rest,tab-attach,tab-model,tab-send}.png`.
+  Skipped: favicon (`/favicon.ico` 404 in the console), add when there is an icon.
+  Contract change done as part of Polish: commit `1c6c0f63` (`feat(composer): optional controlled model via model and onModelChange`). Verified with a throwaway controlled parent (reverted): picker shows the parent's value, a pick calls `onModelChange`, submit sends the parent's value; landing (uncontrolled) unchanged.
