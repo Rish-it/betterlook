@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
@@ -14,6 +14,7 @@ import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {percent, pixel} from '@astryxdesign/core/Resizable/utils';
 import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {Spinner} from '@astryxdesign/core/Spinner';
+import {Text} from '@astryxdesign/core/Text';
 import {TopNav} from '@astryxdesign/core/TopNav';
 import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {Composer} from '@/composer/Composer';
@@ -26,7 +27,7 @@ import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
 import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
-import {changedFiles, unshownApprovals} from '@/components/ai/turn';
+import {changedFiles, startedBuilding, unshownApprovals} from '@/components/ai/turn';
 
 const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
@@ -34,9 +35,6 @@ const SANDBOX_KEY = 'betterlook.sandboxId';
 const APPROVAL_UNSHOWN = 'The approval could not be shown, so it was denied.';
 const CHAT_KEY = 'betterlook.chat';
 const NARROW = '@media (max-width: 640px)';
-
-const noopSubscribe = () => () => {};
-
 
 const readStored = (key: string) => {
   try {
@@ -89,6 +87,14 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
   }),
+  chatOnly: {
+    width: '100%',
+    maxWidth: 720,
+    marginInline: 'auto',
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
   handle: {
     display: {default: null, [NARROW]: 'none'},
   },
@@ -110,6 +116,12 @@ const styles = stylex.create({
   previewHiddenWhenNarrow: {
     display: {default: 'flex', [NARROW]: 'none'},
   },
+  stage: {
+    position: 'relative',
+    flexGrow: 1,
+    minHeight: 0,
+    display: 'flex',
+  },
   frame: {
     flexGrow: 1,
     width: '100%',
@@ -123,7 +135,62 @@ const styles = stylex.create({
     placeItems: 'center',
     pointerEvents: 'none',
   },
+  placeholder: {
+    backgroundColor: colorVars['--color-background-surface'],
+  },
 });
+
+type PreviewPaneProps = {
+  preview: Preview;
+  frameKey: number;
+  isLoading: boolean;
+  onLoad(): void;
+  onRefresh(): void;
+  isHiddenWhenNarrow: boolean;
+};
+
+function PreviewPane({preview, frameKey, isLoading, onLoad, onRefresh, isHiddenWhenNarrow}: PreviewPaneProps) {
+  const [hasPreview, setHasPreview] = useState(false);
+  return (
+    <section
+      aria-label="Preview"
+      aria-busy={isLoading}
+      {...stylex.props(styles.preview, isHiddenWhenNarrow && styles.previewHiddenWhenNarrow)}>
+      <PreviewToolbar
+        url={preview.url}
+        status={preview.error ? 'error' : isLoading || !hasPreview ? 'loading' : 'ready'}
+        message={preview.error}
+        onRefresh={onRefresh}
+      />
+      <div {...stylex.props(styles.stage)}>
+        <iframe
+          key={frameKey}
+          title="App preview"
+          src={preview.url}
+          sandbox="allow-scripts allow-forms allow-popups"
+          onLoad={() => {
+            onLoad();
+            if (preview.url !== PREVIEW_URL) setHasPreview(true);
+          }}
+          {...stylex.props(styles.frame)}
+        />
+        {!hasPreview ? (
+          <div {...stylex.props(styles.loading, styles.placeholder)}>
+            <Text type="supporting" color="secondary">
+              Your preview will appear here
+            </Text>
+          </div>
+        ) : (
+          isLoading && (
+            <div {...stylex.props(styles.loading)}>
+              <Spinner size="md" aria-label="Loading preview" />
+            </div>
+          )
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function Workspace({prompt, model: initialModel}: {prompt: string; model: string}) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -153,8 +220,9 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
-  // A server-rendered iframe can finish loading before hydration and its onLoad is lost.
-  const isHydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  // Latched, so a retry that drops the building turn never hides the preview again.
+  const [hasBuilt, setHasBuilt] = useState(false);
+  if (!hasBuilt && startedBuilding(messages)) setHasBuilt(true);
 
   // A send waits for its provider's key: the text stays in the composer and no request goes out.
   const [held, setHeld] = useState<{text: string; notice: string}>();
@@ -275,16 +343,18 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
         />
       }>
       <div {...stylex.props(styles.body)}>
-        <div {...stylex.props(styles.switcher)}>
-          <SegmentedControl label="Workspace view" layout="fill" value={view} onChange={v => setView(v as View)}>
-            <SegmentedControlItem value="chat" label="Chat" />
-            <SegmentedControlItem value="preview" label="Preview" />
-          </SegmentedControl>
-        </div>
+        {hasBuilt && (
+          <div {...stylex.props(styles.switcher)}>
+            <SegmentedControl label="Workspace view" layout="fill" value={view} onChange={v => setView(v as View)}>
+              <SegmentedControlItem value="chat" label="Chat" />
+              <SegmentedControlItem value="preview" label="Preview" />
+            </SegmentedControl>
+          </div>
+        )}
         <div ref={containerRef} {...stylex.props(styles.split)}>
           <section
             aria-label="Chat"
-            {...stylex.props(styles.chat(resizable.size), view !== 'chat' && styles.hiddenWhenNarrow)}>
+            {...stylex.props(hasBuilt ? styles.chat(resizable.size) : styles.chatOnly, view !== 'chat' && styles.hiddenWhenNarrow)}>
             <Conversation
               messages={messages}
               isStreaming={isBusy}
@@ -320,39 +390,25 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
               )}
             </Conversation>
           </section>
-          <ResizeHandle
-            direction="horizontal"
-            resizable={resizable}
-            isAlwaysVisible={false}
-            label="Resize chat and preview"
-            xstyle={styles.handle}
-          />
-          <section
-            aria-label="Preview"
-            aria-busy={isFrameLoading}
-            {...stylex.props(styles.preview, view !== 'preview' && styles.previewHiddenWhenNarrow)}>
-            <PreviewToolbar
-              url={preview.url}
-              status={preview.error ? 'error' : isFrameLoading ? 'loading' : 'ready'}
-              message={preview.error}
-              onRefresh={refresh}
-            />
-            {isHydrated && (
-              <iframe
-                key={frameKey}
-                title="App preview"
-                src={preview.url}
-                sandbox="allow-scripts allow-forms allow-popups"
-                onLoad={() => setIsFrameLoading(false)}
-                {...stylex.props(styles.frame)}
+          {hasBuilt && (
+            <>
+              <ResizeHandle
+                direction="horizontal"
+                resizable={resizable}
+                isAlwaysVisible={false}
+                label="Resize chat and preview"
+                xstyle={styles.handle}
               />
-            )}
-            {isFrameLoading && (
-              <div {...stylex.props(styles.loading)}>
-                <Spinner size="md" aria-label="Loading preview" />
-              </div>
-            )}
-          </section>
+              <PreviewPane
+                preview={preview}
+                frameKey={frameKey}
+                isLoading={isFrameLoading}
+                onLoad={() => setIsFrameLoading(false)}
+                onRefresh={refresh}
+                isHiddenWhenNarrow={view !== 'preview'}
+              />
+            </>
+          )}
         </div>
       </div>
     </AppShell>

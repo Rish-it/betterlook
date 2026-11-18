@@ -1,6 +1,6 @@
 import {expect, test} from 'bun:test';
 import type {AgentMessage} from '@/lib/agent/types';
-import {cancelReason, changedFiles, hasThought, uniqueById, unshownApprovals} from './turn';
+import {cancelReason, changedFiles, hasThought, startedBuilding, uniqueById, unshownApprovals} from './turn';
 
 const approvalPart = {
   type: 'tool-write_file',
@@ -46,4 +46,17 @@ test('a cancelled call is told apart from a tool error by its reason', () => {
   const error = {type: 'tool-write_file', toolCallId: 'c1', state: 'output-error', input: undefined, errorText: 'Cancelled: the model ended its turn before this call ran.'} as const;
   expect(cancelReason(error)).toBe('Cancelled: the model ended its turn before this call ran.');
   expect(cancelReason({...error, errorText: 'oldText not found in src/App.tsx'})).toBeUndefined();
+});
+
+test('building starts at the first write or edit call, or a saved diff or checkpoint', () => {
+  const user: AgentMessage = {id: 'msg_u', role: 'user', parts: [{type: 'text', text: 'Make the title bigger'}]};
+  const read = {type: 'tool-read_file', toolCallId: 'c1', state: 'input-available', input: {path: 'src/App.tsx'}} as const;
+  const edit = {type: 'tool-edit_file', toolCallId: 'c2', state: 'input-streaming', input: undefined} as const;
+  const checkpoint = {type: 'data-checkpoint', id: 'cp', data: {id: 'cp1', parentId: 'cp0', sandboxId: 'sb', turnId: 't1', createdAt: ''}} as const;
+  expect(startedBuilding([])).toBe(false);
+  expect(startedBuilding([user, assistant([{type: 'text', text: 'Looking.'}, read])])).toBe(false);
+  expect(startedBuilding([user, assistant([read, edit])])).toBe(true);
+  expect(startedBuilding([user, assistant([approvalPart])])).toBe(true);
+  expect(startedBuilding([user, assistant([checkpoint])])).toBe(true);
+  expect(startedBuilding([user, assistant([{type: 'data-diff', id: 'diff', data: {diff: 'diff --git a/x b/x', filesTouched: ['x']}}])])).toBe(true);
 });
