@@ -159,6 +159,42 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - `bun run typecheck`: exit 0 on two clean runs; `bun test`: 4 pass. `react-doctor`: only the two index-key warnings already judged false positives in item 3.
 - [ ] Wire-up: only once the AI loop has that data, swap mocks for live data in the chat panel and connect approve/deny/restore callbacks; list anything still on mocks.
 
+  Partly done; waiting for AI-CORE's checkpoint/verify item. Merged `betterlook` at b9fd648d (`AgentDataParts`, `AgentMessage`, `createAgentChat`) and 18533f49 (AUTH).
+  - Chat panel (`workspace/Workspace.tsx`): the chat is `createAgentChat({getCredential, getSandboxId})`, using `getCredential` from `@/lib/auth/client`; the local stub is gone.
+    - It renders `Conversation`, so live messages go through `Message`.
+    - `Thinking` shows while `status === 'submitted'`.
+    - `PreviewToolbar` replaces the inline toolbar: loading while the iframe loads, error with the sandbox's message, ready otherwise.
+  - Top bar: `AuthControls` sits beside the model picker in the existing `TopNav` `endContent`.
+  - `Message` renders `AgentMessage` parts in order:
+    - a tool part with a matching `data-denied` renders `DeniedCall`
+    - a tool part with a matching `data-approval` renders `ApprovalCard` until its output arrives; the decision comes from the tool part's state (`approval-requested` pending, `approval-responded`/`output-denied` approved or denied)
+    - `data-verify` renders `VerifyResult`, `data-diff` renders `DiffView`, and `data-checkpoint` renders `Checkpoint` (only when a restore handler is passed)
+  - `ApprovalCard` now takes `{approval: PendingApproval; decision; onDecide(approved)}`. Approve and Deny call `chat.addToolApprovalResponse({id: part.approval.id, approved})`, and the chat auto-continues.
+  - Checked live on `/workspace`, with Playwright stubbing `/api/chat` as an AI SDK stream carrying the tool, `data-denied`, `data-approval` and `tool-approval-request` chunks, and `/api/sandbox` returning 500:
+    - the denied read renders as "Blocked: outside project", not an error
+    - the approval card shows the package.json diff
+    - Approve sent a second request whose `write_file` part is `approval-responded`, `{id: 'a3', approved: true}`; the reply streamed and the card became a done `write_file` row
+    - the preview toolbar shows a red dot and "Sandbox provider is down."
+    - Thinking shows during a delayed reply and is gone after it
+    - screenshots: `.screenshots/ai-10-wire-{light,dark}-approval.png` and `-approved.png`
+  - Auth, checked live with the session stubbed signed-out:
+    - the trigger reads "Connect OpenAI"
+    - after a fake placeholder key is saved, it reads "OpenAI API key", and the next `/api/chat` body carries `{provider: 'openai', kind: 'api-key'}` plus `sandboxId`
+    - the key text never appears on the page
+    - layout unchanged
+    - screenshots: `.screenshots/ai-10-auth-{light,dark}-signed-out.png`, `-popover.png` and `-api-key.png`
+  - Dev page: a "Live turn shape" section renders one `AgentMessage` with every data part (`.screenshots/ai-10-live-turn-{light,dark}.png`). Full page: `.screenshots/ai-final-dev-{light,dark}.png`.
+  - Checks:
+    - `bun run typecheck`: exit 0 on two clean runs
+    - `bun test` (whole app): 49 pass on both runs
+    - `react-doctor`: two index-key warnings (text and reasoning parts, already judged false positives) and `Workspace.tsx:166` data fetching in an effect (AI-CORE's sandbox request, kept as asked)
+  - Still not live:
+    - Restore: `Workspace` passes no `onEvent`, so `Checkpoint` doesn't render in the live chat. It needs AI-CORE's restore action.
+    - Verify, checkpoint and diff parts: rendering is wired, but AI-CORE's stream doesn't emit them yet. Until it does, the dev page shows them from fixtures.
+    - Attachments: `Composer` passes files to `onSubmit`, but `Workspace.send` drops them; the agent takes no files.
+    - The first request after a new prompt goes out with `sandboxId: null`, because the sandbox request is still pending. That is pre-existing timing in the sandbox flow.
+    - `AuthControls` hard-codes `#000`/`#202020` on its ChatGPT button (AUTH's file); flagged for AUTH, not changed.
+
 ## Questions for the founder
 
 1. Map above: OK to proceed?

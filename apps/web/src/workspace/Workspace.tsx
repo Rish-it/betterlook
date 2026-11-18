@@ -4,6 +4,7 @@ import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
+import {HStack} from '@astryxdesign/core/Layout';
 import {
   ChatMessage,
   ChatMessageBubble,
@@ -17,8 +18,9 @@ import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/token
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
 import {MODELS} from '@/lib/agent/models';
-import type {ProviderCredential} from '@/lib/agent/types';
 import {createAgentChat} from '@/lib/agent/client';
+import {getCredential} from '@/lib/auth/client';
+import {AuthControls} from '@/components/auth/AuthControls';
 import {Conversation} from '@/components/ai/Conversation';
 import {PreviewToolbar} from '@/components/ai/PreviewToolbar';
 import {Thinking} from '@/components/ai/Thinking';
@@ -30,9 +32,6 @@ const CHAT_KEY = 'betterlook.chat';
 const NARROW = '@media (max-width: 640px)';
 
 const noopSubscribe = () => () => {};
-
-// Stub until AUTH's lib/auth/client.ts lands on betterlook; replace with its import.
-const getCredential = (): ProviderCredential | null => null;
 
 
 const readStored = (key: string) => {
@@ -195,7 +194,12 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
         <TopNav
           label="Workspace"
           heading={PROJECT_NAME}
-          endContent={<ModelPicker value={model} onChange={setModel} />}
+          endContent={
+            <HStack gap={2} align="center">
+              <ModelPicker value={model} onChange={setModel} />
+              <AuthControls />
+            </HStack>
+          }
         />
       }>
       <div {...stylex.props(styles.body)}>
