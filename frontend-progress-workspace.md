@@ -50,7 +50,14 @@ Source of component list: `docs/specs/components/` in github.com/meta/astryx.
   - Preview is a self-contained HTML route (`workspace/preview/route.ts`) in a sandboxed iframe without `allow-same-origin`: Next dev returns 403 to `Origin: null` requests, so a Next page in the strict sandbox lost its CSS and JS; react-doctor flags `allow-scripts` + `allow-same-origin` together.
   - Astryx has no refresh icon; refresh uses a small inline SVG passed to `Icon`, as Astryx's Icon docs direct.
 - [ ] Polish: narrow window (~400px), iframe loading, and keyboard use of the divider and toolbar look and work right.
+  - In progress, not ticked (blocked on Q1 below). Done so far: merged `betterlook` 86718025; FE-A `Composer` and `ModelPicker` replace the placeholders; top-bar picker starts from the `model` param; mock reply is generic; sends in the workspace append to the chat.
+  - `.screenshots/e2e-workspace-1440.png`: typed on `/`, Enter, landed on `/workspace?prompt=Make+the+nav+sticky&model=gpt-5`; message shown, top picker GPT-5.
+  - `.screenshots/workspace-400-chat.png`, `.screenshots/workspace-400-preview.png`: below 640px a SegmentedControl switches Chat/Preview, divider hidden, no horizontal scroll (scrollWidth 400). Borderless holds.
+  - `.screenshots/divider-focus-1440.png`: divider shows no line at rest, a focus ring only on keyboard focus. Toolbar: ArrowRight moves focus Refresh to Open-in-new-tab.
+  - Iframe loading: Spinner over the frame until `onLoad`, again on refresh; `aria-busy` on the preview section.
+  - Typecheck two runs exit 0; react-doctor 100/100.
 
 ## Questions
 
 - Resolved: FE-A scaffold merged.
+- Q1 (blocks Polish): FE-A's `Composer` keeps its own model state, always starting at `MODELS[0]` (Claude Sonnet 5.5), and the contract gives it no way to receive a model. On `/workspace?model=gpt-5` the top-bar picker shows GPT-5 but the composer's picker shows Claude Sonnet 5.5, and the next send reports Claude Sonnet 5.5, flipping the top bar back. Options: (a) add an optional `model` + `onModelChange` (or `initialModel`) prop to `Composer` (FE-A file, contract change); (b) drop the top-bar picker and let the composer's picker be the only one, accepting that it ignores the `model` param until (a). Recommend (a). Needs orchestrator decision.
