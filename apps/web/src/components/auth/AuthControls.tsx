@@ -8,9 +8,10 @@ import {Link} from '@astryxdesign/core/Link';
 import {Popover} from '@astryxdesign/core/Popover';
 import {Text} from '@astryxdesign/core/Text';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {colorVars} from '@astryxdesign/core/theme/tokens.stylex';
+import {colorVars, focusVars} from '@astryxdesign/core/theme/tokens.stylex';
 import * as stylex from '@stylexjs/stylex';
-import {getCredential, setOpenAIApiKey} from '@/lib/auth/client';
+import type {ProviderId} from '@/lib/agent/types';
+import {getCredential, setApiKey} from '@/lib/auth/client';
 import type {ChatGPTIssue, ChatGPTStatus} from '@/lib/auth/status';
 import chatGPTLogo from './chatgpt-logo-white.svg';
 
@@ -32,6 +33,11 @@ const styles = stylex.create({
     backgroundColor: colorVars['--color-background-muted'],
     borderWidth: 0,
     boxShadow: 'none',
+    outline: {
+      default: 'none',
+      ':has(:focus-visible)': `${focusVars['--focus-outline-width']} ${focusVars['--focus-outline-style']} ${focusVars['--focus-outline-color']}`,
+    },
+    outlineOffset: focusVars['--focus-outline-offset'],
   },
   account: {minWidth: 0},
 });
@@ -48,6 +54,10 @@ const issueMessages: Record<ChatGPTIssue, string> = {
 };
 
 const sessionUrl = '/api/auth/chatgpt/session';
+const apiKeyProviders: {id: ProviderId; name: string}[] = [
+  {id: 'openai', name: 'OpenAI'},
+  {id: 'anthropic', name: 'Anthropic'},
+];
 
 function takeCallbackIssue(): ChatGPTIssue | undefined {
   const url = new URL(window.location.href);
@@ -63,7 +73,7 @@ function connectionDescription(status: ChatGPTStatus | null, hasKey: boolean) {
   if (status.status === 'signed-out') {
     return status.available ? 'Use your existing plan for eligible requests.' : 'ChatGPT sign-in is unavailable here.';
   }
-  if (hasKey) return 'Requests use your API key while it’s added.';
+  if (hasKey) return 'OpenAI requests use your API key while it’s added.';
   return status.planEnabled ? 'Eligible requests use your ChatGPT plan.' : 'ChatGPT plan access is off.';
 }
 
@@ -113,12 +123,52 @@ function ChatGPTConnection({status, hasKey, issue, onSignOut}: {
   );
 }
 
+function ApiKeyControl({name, isConnected, onChange}: {
+  name: string;
+  isConnected: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const apiKey = draft.trim();
+
+  function saveKey(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!apiKey) return;
+    setDraft('');
+    onChange(apiKey);
+  }
+
+  return isConnected ? (
+    <HStack align="center" justify="between" gap={2}>
+      <Text weight="semibold">{name} API key added</Text>
+      <Button label="Remove" aria-label={`Remove ${name} API key`} size="sm" variant="ghost" onClick={() => onChange('')} />
+    </HStack>
+  ) : (
+    <form onSubmit={saveKey}>
+      <VStack gap={2}>
+        <TextInput
+          label={`${name} API key`}
+          type="password"
+          autoComplete="off"
+          value={draft}
+          onChange={setDraft}
+          controlXstyle={styles.field}
+          width="100%"
+        />
+        <Button type="submit" label={`Add ${name} key`} size="sm" isDisabled={!apiKey} />
+      </VStack>
+    </form>
+  );
+}
+
 export function AuthControls() {
   const [status, setStatus] = useState<ChatGPTStatus | null>(null);
   const [open, setOpen] = useState(false);
   const [issue, setIssue] = useState<ChatGPTIssue>();
-  const [hasKey, setHasKey] = useState(() => Boolean(getCredential()));
-  const [draftKey, setDraftKey] = useState('');
+  const [keyStatus, setKeyStatus] = useState(() => ({
+    openai: Boolean(getCredential('openai')),
+    anthropic: Boolean(getCredential('anthropic')),
+  }));
   const pending = useRef<AbortController | null>(null);
   const signOutPending = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -167,22 +217,21 @@ export function AuthControls() {
     return () => pending.current?.abort();
   }, [requestStatus]);
 
-  function saveKey(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!draftKey.trim()) return;
-    setOpenAIApiKey(draftKey);
-    setDraftKey('');
-    setHasKey(true);
+  function updateApiKey(provider: ProviderId, value: string) {
+    setApiKey(provider, value);
+    setKeyStatus(current => ({...current, [provider]: Boolean(value)}));
     close();
   }
 
-  const signedIn = status?.status === 'signed-in' ? status : null;
-  const usesPlan = signedIn?.planEnabled && !hasKey;
-  const trigger = hasKey ? 'OpenAI API key' : usesPlan ? 'Using ChatGPT plan' : 'Connect OpenAI';
+  const hasChatGPTPlan = status?.status === 'signed-in' && status.planEnabled;
+  const connectedProviders = apiKeyProviders
+    .filter(({id}) => keyStatus[id] || (id === 'openai' && hasChatGPTPlan))
+    .map(({name}) => name)
+    .join(' + ');
 
   return (
     <Popover
-      label="OpenAI access"
+      label="Model access"
       alignment="end"
       width={328}
       padding={4}
@@ -191,50 +240,25 @@ export function AuthControls() {
       onOpenChange={next => {
         setOpen(next);
         if (next) void requestStatus();
-        else {
-          setDraftKey('');
-          setIssue(undefined);
-        }
+        else setIssue(undefined);
       }}
-      content={
+      content={open && (
         <VStack gap={4}>
-          <ChatGPTConnection status={status} hasKey={hasKey} issue={issue} onSignOut={() => requestStatus('POST')} />
-
-          {hasKey ? (
-            <HStack align="center" justify="between" gap={2}>
-              <Text type="supporting">API key added for this page.</Text>
-              <Button
-                label="Remove key"
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setOpenAIApiKey('');
-                  setHasKey(false);
-                  close();
-                }}
-              />
-            </HStack>
-          ) : (
-            <form onSubmit={saveKey}>
-              <VStack gap={2}>
-                <TextInput
-                  label="OpenAI API key"
-                  type="password"
-                  autoComplete="off"
-                  value={draftKey}
-                  onChange={setDraftKey}
-                  description="Kept in this page until you reload."
-                  controlXstyle={styles.field}
-                  width="100%"
-                />
-                <Button type="submit" label="Use API key" size="sm" isDisabled={!draftKey.trim()} />
-              </VStack>
-            </form>
-          )}
+          <ChatGPTConnection status={status} hasKey={keyStatus.openai} issue={issue} onSignOut={() => requestStatus('POST')} />
+          {apiKeyProviders.map(({id, name}) => (
+            <ApiKeyControl key={id} name={name} isConnected={keyStatus[id]} onChange={value => updateApiKey(id, value)} />
+          ))}
+          <Text type="supporting">Keys are kept on this page until you reload.</Text>
         </VStack>
-      }
+      )}
     >
-      <Button ref={triggerRef} label={trigger} size="sm" variant="ghost" />
+      <Button
+        ref={triggerRef}
+        label={connectedProviders || 'Connect models'}
+        aria-label={connectedProviders ? `${connectedProviders} connected` : undefined}
+        size="sm"
+        variant="ghost"
+      />
     </Popover>
   );
 }
