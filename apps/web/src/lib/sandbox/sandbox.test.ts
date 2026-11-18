@@ -2,13 +2,14 @@
 import {expect, test} from 'bun:test';
 import type {Sandbox} from '@vercel/sandbox';
 import {POST} from '@/app/api/sandbox/route';
-import {connectSandbox, createSandbox} from './sandbox';
+import {connectSandbox, createSandbox, openProject} from './sandbox';
 import {PREVIEW_PORT, STARTER_FILES} from './starter';
 
 function fakeApi(failOn?: string) {
   const calls: string[] = [];
   const sandbox = {
     name: 'sbx-test',
+    cwd: '/vercel/sandbox',
     domain: (port: number) => `https://sbx-test-${port}.example`,
     writeFiles: async (files: {path: string}[]) => void calls.push(`write ${files.map(f => f.path).sort().join(',')}`),
     runCommand: async (cmdOrParams: string | {cmd: string; args: string[]; detached?: boolean}, args: string[] = []) => {
@@ -66,4 +67,11 @@ test('the sandbox route says so when it is not configured', async () => {
   const res = await POST(new Request('http://x/api/sandbox', {method: 'POST', body: JSON.stringify({sandboxId: null})}));
   expect(res.status).toBe(503);
   expect(await res.text()).toBe('The preview sandbox is not configured yet.');
+});
+
+test('the agent works on the resumed sandbox, rooted at its working directory', async () => {
+  const {api, calls} = fakeApi();
+  const project = await openProject('sbx-test', api);
+  expect([project.id, project.root]).toEqual(['sbx-test', '/vercel/sandbox']);
+  expect(calls).toEqual(['get sbx-test resume=true', 'npm run dev &']);
 });
