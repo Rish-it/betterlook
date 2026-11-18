@@ -64,6 +64,8 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - `bun run typecheck`: exit 0 on two clean runs.
   - `react-doctor`: I fixed the non-component export in `ToolCall.tsx`. Two `no-array-index-as-key` warnings remain in `Message.tsx`. I judged them false positives: `TextUIPart` has no id and a message's parts are append-only, so the index is their stable identity. Reasoning uses `part.id` when it has one. A one-line comment in the code records why.
 - [ ] Prompt input upgrade.
+
+  - Orchestrator: the model list moves to AI-CORE's `lib/agent/models.ts` (plain data, OpenAI default first). When that is on `betterlook`, point `ModelPicker` at it and delete `composer/models.ts`. Until then, keep the current list.
 - [ ] Tool call row and denied call.
 - [ ] Approval card.
 - [ ] Verify result and diff view.
