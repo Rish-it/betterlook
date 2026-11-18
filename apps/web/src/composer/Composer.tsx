@@ -12,7 +12,11 @@ const styles = stylex.create({
   borderless: {
     borderColor: 'transparent',
     boxShadow: 'none',
-    backgroundColor: 'var(--color-background-muted)',
+    outlineStyle: 'none',
+    backgroundColor: {
+      default: 'var(--color-background-muted)',
+      ':focus-within': 'color-mix(in srgb, var(--color-background-muted), var(--color-text-primary) 5%)',
+    },
   },
 });
 
