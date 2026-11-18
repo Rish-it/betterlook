@@ -25,9 +25,11 @@ export interface ToolCallRecord {
   durationMs: number;
 }
 
+export type VerifyCheckStatus = 'passed' | 'failed' | 'skipped';
+
 export interface VerifyCheck {
   name: 'typecheck' | 'build' | 'runtime';
-  ok: boolean;
+  status: VerifyCheckStatus;
   errors: string[];
   durationMs: number;
 }
@@ -58,7 +60,7 @@ export interface TurnRecord {
   traceId: string;
   sandboxId: string;
   prompt: string;
-  provider: ProviderId;
+  provider: string;
   model: string;
   systemPromptHash: string;
   toolConfigHash: string;

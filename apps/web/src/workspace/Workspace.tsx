@@ -29,6 +29,8 @@ import type {ProviderCredential} from '@/lib/agent/types';
 
 const PROJECT_NAME = 'Untitled project';
 const PREVIEW_URL = '/workspace/preview';
+const SANDBOX_KEY = 'betterlook.sandboxId';
+const CHAT_KEY = 'betterlook.chat';
 const NARROW = '@media (max-width: 640px)';
 
 const noopSubscribe = () => () => {};
@@ -38,6 +40,31 @@ const getCredential = (): ProviderCredential | null => null;
 
 type AgentMessage = UIMessage<{model: string}>;
 const transport = new DefaultChatTransport<AgentMessage>({api: '/api/chat', body: () => ({credential: getCredential()})});
+
+const readStored = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+type Preview = {url: string; error?: string};
+
+async function requestSandbox(): Promise<Preview> {
+  try {
+    const res = await fetch('/api/sandbox', {method: 'POST', body: JSON.stringify({sandboxId: readStored(SANDBOX_KEY)})});
+    if (!res.ok) return {url: PREVIEW_URL, error: await res.text()};
+    const {sandboxId, previewUrl}: {sandboxId: string; previewUrl: string} = await res.json();
+    localStorage.setItem(SANDBOX_KEY, sandboxId);
+    return {url: previewUrl};
+  } catch {
+    return {url: PREVIEW_URL, error: 'The preview sandbox could not be reached. Reload to try again.'};
+  }
+}
+
+// One request per page load, so StrictMode's double effect never starts two sandboxes.
+let sandboxRequest: Promise<Preview> | null = null;
 
 const textOf = (m: UIMessage) => m.parts.map(p => (p.type === 'text' ? p.text : '')).join('');
 type View = 'chat' | 'preview';
@@ -84,6 +111,9 @@ const styles = stylex.create({
   hiddenWhenNarrow: {
     display: {default: null, [NARROW]: 'none'},
   },
+  previewHiddenWhenNarrow: {
+    display: {default: 'flex', [NARROW]: 'none'},
+  },
   frame: {
     flexGrow: 1,
     width: '100%',
@@ -120,7 +150,8 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
   const [model, setModel] = useState(initialModelValue);
   // Owned here so StrictMode's simulated unmount cannot stop the first send.
   const [chat] = useState(() => new Chat<AgentMessage>({transport}));
-  const {messages, sendMessage, status, stop, error} = useChat({chat});
+  const {messages, setMessages, sendMessage, status, stop, error} = useChat({chat});
+  const [preview, setPreview] = useState<Preview>({url: PREVIEW_URL});
   const isBusy = status === 'submitted' || status === 'streaming';
   const [view, setView] = useState<View>('chat');
   const [frameKey, setFrameKey] = useState(0);
@@ -133,12 +164,38 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     sendMessage({text, metadata: {model: sentModel}}, {body: {model: sentModel}});
   };
 
-  const sentInitial = useRef(false);
+  const started = useRef(false);
   useEffect(() => {
-    if (sentInitial.current) return;
-    sentInitial.current = true;
-    sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
-  }, [prompt, initialModelValue, sendMessage]);
+    if (started.current) return;
+    started.current = true;
+    const isNewProject = new URLSearchParams(window.location.search).has('prompt');
+    const saved = isNewProject ? null : readStored(CHAT_KEY);
+    if (isNewProject) {
+      localStorage.removeItem(SANDBOX_KEY);
+      localStorage.removeItem(CHAT_KEY);
+      sandboxRequest = null;
+      window.history.replaceState(null, '', `/workspace?${new URLSearchParams({model: initialModelValue})}`);
+    }
+    if (saved) setMessages(JSON.parse(saved));
+    else sendMessage({text: prompt, metadata: {model: initialModelValue}}, {body: {model: initialModelValue}});
+  }, [prompt, initialModelValue, sendMessage, setMessages]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    sandboxRequest ??= requestSandbox();
+    sandboxRequest.then(next => {
+      if (!isCurrent) return;
+      setIsFrameLoading(true);
+      setPreview(next);
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0 && !isBusy) localStorage.setItem(CHAT_KEY, JSON.stringify(messages));
+  }, [messages, isBusy]);
 
   const refresh = () => {
     setIsFrameLoading(true);
@@ -211,11 +268,11 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
           <section
             aria-label="Preview"
             aria-busy={isFrameLoading}
-            {...stylex.props(styles.preview, view !== 'preview' && styles.hiddenWhenNarrow)}>
+            {...stylex.props(styles.preview, view !== 'preview' && styles.previewHiddenWhenNarrow)}>
             <Toolbar
               label="Preview"
               size="sm"
-              startContent={<Text type="supporting" color="secondary">Preview</Text>}
+              startContent={<Text type="supporting" color="secondary">{preview.error ?? 'Preview'}</Text>}
               endContent={
                 <>
                   <IconButton
@@ -230,7 +287,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                     variant="ghost"
                     size="sm"
                     icon={<Icon icon="externalLink" />}
-                    href={PREVIEW_URL}
+                    href={preview.url}
                     target="_blank"
                     rel="noopener noreferrer"
                   />
@@ -241,7 +298,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
               <iframe
                 key={frameKey}
                 title="App preview"
-                src={PREVIEW_URL}
+                src={preview.url}
                 sandbox="allow-scripts allow-forms allow-popups"
                 onLoad={() => setIsFrameLoading(false)}
                 {...stylex.props(styles.frame)}

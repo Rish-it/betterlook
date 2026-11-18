@@ -29,7 +29,7 @@ const textModel = (chunks: string[], delay?: number) =>
 
 test('streams the model reply with the configured limits', async () => {
   const model = textModel(['Hel', 'lo']);
-  const result = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
+  const {result} = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
   expect(await result.text).toBe('Hello');
   const call = model.doStreamCalls[0];
   expect(call.maxOutputTokens).toBe(AGENT_CONFIG.maxOutputTokens);
@@ -38,7 +38,7 @@ test('streams the model reply with the configured limits', async () => {
 
 test('stops streaming when aborted', async () => {
   const controller = new AbortController();
-  const result = runAgent({
+  const {result} = runAgent({
     model: textModel(Array(50).fill('x'), 10),
     messages: [{role: 'user', content: 'hi'}],
     abortSignal: controller.signal,
@@ -78,6 +78,6 @@ test('stops at the configured step limit when the model keeps calling tools', as
       }),
     }),
   });
-  const result = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
+  const {result} = runAgent({model, messages: [{role: 'user', content: 'hi'}]});
   expect((await result.steps).length).toBe(AGENT_CONFIG.maxSteps);
 });
