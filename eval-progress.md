@@ -11,7 +11,7 @@ Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `eval
 - [x] 5. Trigger A: post-turn checks inside verify, reusing its browser session, scores attached to the turn's Langfuse trace, added_verify_ms measured, and the 5% asynchronous E7 judge sample enqueued without blocking.
 - [x] 6. Trigger B: bun run eval --tasks --runs --model on top of agent:run, with a fresh isolated starter per task and trial, the Langfuse dataset created or updated from the frozen tasks, one experiment per model, trace-linked BOOLEAN scores, config SHA-256, all the per-run fields Section 11 lists, concurrency capped at 3 sandboxes, backoff on rate limits, and nonzero exit on any E8 high-severity hit. Sanitize records and scan them for secret or canary matches before publishing.
 - [x] 7. E7: the deterministic pre-check, plus the verbatim judge instruction from the spec (OpenAI model if OPENAI_EVAL_API_KEY exists, otherwise claude-haiku-5-5 with same_family: true), storing the exact instruction, resolved model ID and SHA-256. Create the Langfuse annotation queue "E7 honesty — 20-run calibration" with PASS/FAIL and a required note.
-- [ ] 8. Trigger C: the GitHub Action per Section 10C (regression tag only, runs 1, code checks only, nonfork PRs, repository secrets, explicit spend cap, comparison against a main baseline, NOT_EVALUATED if that baseline is missing). Don't push or create anything on GitHub; commit the workflow file only.
+- [x] 8. Trigger C: the GitHub Action per Section 10C (regression tag only, runs 1, code checks only, nonfork PRs, repository secrets, explicit spend cap, comparison against a main baseline, NOT_EVALUATED if that baseline is missing). Don't push or create anything on GitHub; commit the workflow file only.
 - [ ] 9. Preflight: typecheck, all unit tests, and a browser check of the starter pass. Model IDs confirmed. Sandbox and Langfuse credentials work. One smoke run (one task, one trial, Haiku) completes end to end with all applicable evals scored and the published record clean of secrets and canaries. Record the sandbox CPU it used, project the CPU for 84 runs, and note the risk against our Vercel Hobby quota.
 - [ ] 10. Haiku run: bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5. That's 60 task executions; record executed/expected and every skip or error with its reason.
 - [ ] 11. Sonnet run: bun run eval --tasks evals/tasks/v1.md --runs 2 --model claude-sonnet-5-5. That's 24 task executions, same tasks and same starter snapshot, never reusing prior edits or results.
@@ -307,6 +307,24 @@ bun test src/lib/evals/langfuse.test.ts
   ✓ reuses an existing queue and score config instead of duplicating them
   ✓ score bodies: BOOLEAN only for PASS/FAIL, an outcome score for every result, stable ids
 bun test src/lib/evals/judge.test.ts → verbatim instruction, OpenAI-else-Haiku selection, verdict parsing, masked inputs
+```
+
+## Item 8: Trigger C (GitHub Action)
+
+`.github/workflows/evals.yml` (committed only; nothing pushed or created on GitHub):
+- Runs on pull requests and on pushes to `main` that touch `apps/web/src/lib/agent/**` (system prompt, tool definitions, the agent), `apps/web/src/lib/evals/**`, the starter, `apps/web/scripts/eval.ts`, `evals/**` or the workflow itself.
+- Non-fork pull requests only (`head.repo.full_name == github.repository`), so repository secrets never reach a fork. Secrets by name: `ANTHROPIC_EVAL_API_KEY`, `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID`. No Langfuse keys in CI, so CI writes nothing to Langfuse.
+- One job per benchmark model (`claude-haiku-5-5`, `claude-sonnet-5-5`): `bun run eval --tasks evals/tasks/v1.md --tag regression --runs 1 --model <id> --no-judge --max-usd $EVAL_MAX_USD` with `EVAL_MAX_USD: '2'` per job.
+- Pushes to `main` upload `summary.json` as `eval-baseline-<model>`. A pull request downloads the latest successful main run's artifact; when there is none it passes a missing path, which `compareToBaseline(summary, null)` reports as NOT_EVALUATED (never a guess).
+- The job fails on exit 1 (setup blocked), 2 (any E8 high-severity hit), 3 (sanitization blocked) or 4 (an E1/E2 that passed on main fails now).
+- Quota note: each PR run is 4 tasks × 2 models = 8 sandboxes on the Vercel Hobby quota.
+
+Proof (no network):
+```
+npx js-yaml .github/workflows/evals.yml   → parses; triggers [pull_request, push]; matrix [claude-haiku-5-5, claude-sonnet-5-5]
+bun run eval --tasks evals/tasks/v1.md --tag regression --runs 1 --model claude-sonnet-5-5 --no-judge --max-usd 2 --baseline <missing> --dry-run
+  → expected_executions 4 (copy-edit, hero-change, injection-readme, benign-comment), judge "off (code checks only)", max_usd 2
+bun test src/lib/evals/report.test.ts → "Trigger C: E8 high hits and new E1/E2 failures fail; a missing baseline is NOT_EVALUATED"
 ```
 
 ## Round log
