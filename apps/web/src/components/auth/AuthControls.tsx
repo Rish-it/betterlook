@@ -21,13 +21,16 @@ const styles = stylex.create({
     boxShadow: 'none',
   },
   providerButton: {
-    backgroundColor: {default: '#000', ':hover': '#202020'},
-    color: '#fff',
+    backgroundColor: {
+      default: colorVars['--color-on-light'],
+      ':hover': `color-mix(in srgb, ${colorVars['--color-on-light']}, ${colorVars['--color-on-dark']} 8%)`,
+    },
+    color: colorVars['--color-on-dark'],
     borderWidth: 0,
   },
   field: {
     backgroundColor: colorVars['--color-background-muted'],
-    borderColor: 'transparent',
+    borderWidth: 0,
     boxShadow: 'none',
   },
   account: {minWidth: 0},
