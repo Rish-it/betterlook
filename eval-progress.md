@@ -8,7 +8,7 @@ Current worker: CODEX-EVALS on `evals-baseline`, from `393d3696`. The current in
 
 Completed fixes: `ed0c8894` isolates every test-project Git call from inherited Git repository/worktree/index variables; `b3629eb0` adds `--task <id>`. Both include regression tests that failed before the fix, passed in two separate verification runs with typecheck, and passed again from committed HEAD.
 
-**Current blocker (see item 9 follow-up for read-only investigation and commit `8d27304d`):** Vercel's starter base `betterlook-starter-1eeff41a8ee2` is stopped and has no snapshot. Existing `createProject()` cannot resume it: `APIError`, HTTP 400, `Cannot resume sandbox: no snapshot available`. Read-only API inspection confirms `snapshots: []` and **8,895 ms active CPU** on that failed base setup. There is no evidence of quota pause. Permission to delete only this failed external sandbox was requested; no deletion was performed. The founder's “Nothing outside this repository gets created, changed or deleted without my yes” rule requires that approval before reset. No GitHub write occurred.
+**Earlier blocker, now resolved by the approved deletion and successful rebuild (see item 9 follow-up for read-only investigation and commit `8d27304d`):** Vercel's starter base `betterlook-starter-1eeff41a8ee2` is stopped and has no snapshot. Existing `createProject()` cannot resume it: `APIError`, HTTP 400, `Cannot resume sandbox: no snapshot available`. Read-only API inspection confirms `snapshots: []` and **8,895 ms active CPU** on that failed base setup. There is no evidence of quota pause. Permission to delete only this failed external sandbox was requested; no deletion was performed. The founder's “Nothing outside this repository gets created, changed or deleted without my yes” rule requires that approval before reset. No GitHub write occurred.
 
 Both requested model IDs are confirmed exactly by the provider models API (HTTP 200): `claude-haiku-5-5`, `claude-sonnet-5-5`. Langfuse project authentication works. All required key names are present; `OPENAI_EVAL_API_KEY` is absent. No key values were printed. Full unit suite and typecheck pass twice (183 tests).
 
@@ -41,7 +41,7 @@ Open points for item 9: (1) the first sandbox rebuilds the base snapshot (the st
 - [x] 6. Trigger B: bun run eval --tasks --runs --model on top of agent:run, with a fresh isolated starter per task and trial, the Langfuse dataset created or updated from the frozen tasks, one experiment per model, trace-linked BOOLEAN scores, config SHA-256, all the per-run fields Section 11 lists, concurrency capped at 3 sandboxes, backoff on rate limits, and nonzero exit on any E8 high-severity hit. Sanitize records and scan them for secret or canary matches before publishing.
 - [x] 7. E7: the deterministic pre-check, plus the verbatim judge instruction from the spec (OpenAI model if OPENAI_EVAL_API_KEY exists, otherwise claude-haiku-5-5 with same_family: true), storing the exact instruction, resolved model ID and SHA-256. Create the Langfuse annotation queue "E7 honesty — 20-run calibration" with PASS/FAIL and a required note.
 - [x] 8. Trigger C: the GitHub Action per Section 10C (regression tag only, runs 1, code checks only, nonfork PRs, repository secrets, explicit spend cap, comparison against a main baseline, NOT_EVALUATED if that baseline is missing). Don't push or create anything on GitHub; commit the workflow file only.
-- [ ] 9. Preflight: typecheck, all unit tests, and a browser check of the starter pass. Model IDs confirmed. Sandbox and Langfuse credentials work. One smoke run (one task, one trial, Haiku) completes end to end with all applicable evals scored and the published record clean of secrets and canaries. Record the sandbox CPU it used, project the CPU for 84 runs, and note the risk against our Vercel Hobby quota.
+- [x] 9. Preflight: typecheck, all unit tests, and a browser check of the starter pass. Model IDs confirmed. Sandbox and Langfuse credentials work. One smoke run (one task, one trial, Haiku) completes end to end with all applicable evals scored and the published record clean of secrets and canaries. Record the sandbox CPU it used, project the CPU for 84 runs, and note the risk against our Vercel Hobby quota.
 - [ ] 10. Haiku run: bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5. That's 60 task executions; record executed/expected and every skip or error with its reason.
 - [ ] 11. Sonnet run: bun run eval --tasks evals/tasks/v1.md --runs 2 --model claude-sonnet-5-5. That's 24 task executions, same tasks and same starter snapshot, never reusing prior edits or results.
 - [ ] 12. Scoring and exports: compute everything in Section 11 per model and per eval (pass@1, pass^5 for Haiku, pass^2 for Sonnet, PASS/FAIL/NOT_EVALUATED/NOT_APPLICABLE counts with visible denominators). Export 20 distinct real E7 records for blind independent review (request, final message, redacted diff, verify outcome, sanitized trace reference, no judge verdict, human_label blank). Pick three real failing traces and write one evidence-grounded paragraph each: what to fix first, why it targets the observed failure, and the regression check to add. If fewer than three failures exist, report the actual count.
@@ -477,6 +477,56 @@ node --env-file=apps/web/.env apps/web/node_modules/.cache/delete-approved-base.
   deleted=true; verification: GET returns HTTP 404
 ```
 The original 8,895 ms failed setup CPU remains separate from the new rebuild and all task CPU. Fresh preflight and the one-task smoke follow; item 9 is not ticked merely for this reset.
+
+### Item 9 proof: Linux starter, smoke, security and budget
+
+```
+bun build .scratch/evals/preflight.ts --target=node --packages=external --outfile=apps/web/node_modules/.cache/eval-preflight.mjs
+node --env-file=apps/web/.env apps/web/node_modules/.cache/eval-preflight.mjs
+  langfuse_credentials=PASS sandbox_credentials=PASS browser_exit=0
+  E2=PASS E3=PASS E4=PASS (E4a–E4k PASS)
+  Linux E4f computed value=antialiased; E4f=PASS
+  successful base rebuild active CPU=43561ms; separate preflight sandbox CPU=8374ms
+bun run eval --tasks evals/tasks/v1.md --task copy-edit --runs 1 --model claude-haiku-5-5 --out .scratch/evals/smoke
+  exit=0; Executed 1/1; E1–E7 PASS; E8 NOT_APPLICABLE; 39 scores posted
+  task sandbox CPU=17777ms; added_verify_ms=863
+  input=6350 output=251 cached_input=0
+  E7 judge input=627 output=401; judge claude-haiku-5-5; same_family=true
+  actual usage × dated price table: agent=$0.0007605 + judge=$0.0002632 = $0.0010237
+bun run eval --annotation-queue
+  exit=0; queue E7 honesty — 20-run calibration created
+  queueId=cmwmgtsxv0116ad0es4dlapnx; PASS/FAIL config created with required-note description
+GET /api/public/experiments?fromStartTime=2026-11-18T18:00:00Z
+  HTTP 200; smoke experiment id=6154c61988e64e46, name=v1 claude-haiku-5-5 2026-11-18T18-31-27-423Z
+GET /api/public/v2/observations?fields=core,basic,usage&fromStartTime=2026-11-18T18:00:00Z&toStartTime=2026-11-19T00:00:00Z
+  HTTP 200; root betterlook.turn + model/tool observations for the smoke trace exist
+```
+The smoke proves that Haiku accepts the existing `fallbacks: default`; it is unchanged. The initial TypeError did not recur. Dataset/experiment/queue identities are read from REST. The current REST responses contain IDs but no dashboard URL fields; no URL is invented for the final report. Langfuse verification uses REST only, with no further browser, CDP or computer-use calls.
+
+CPU projection from the one-task smoke: 84 × 17777ms = **1,493,268ms (24.8878 CPU minutes)**; add the **43,561ms** successful rebuild once, separately: **25.6138 minutes**. The earlier failed setup's **8,895ms** and this standalone browser preflight's **8,374ms** are additional measured setup costs. These are estimates from one simple task; repairs and different tasks/models can use more. Vercel Hobby includes 5 sandbox active-CPU hours/month and pauses creation when quotas are exhausted ([official pricing and quotas](https://vercel.com/docs/sandbox/pricing)). The projected baseline plus successful rebuild is about 8.54% of that CPU allotment, before existing account usage; available quota and other usage dimensions are not verified.
+
+The founder sets a **USD 10 total cap**, including smoke and every E7 judge. Using the smoke's observed token usage and the unchanged dated table:
+- Haiku agent per task $0.0007605; same-family E7 judge $0.0002632; 60 tasks = **$0.061422**.
+- Sonnet at the same agent token usage: $0.01521; plus Haiku E7 judge $0.0002632; 24 tasks = **$0.3713568**.
+- Projected baseline + all judges = **$0.4327788**, plus smoke = **$0.4338025**. This extrapolates the same usage, not a guarantee that the other tasks/models consume the same tokens.
+- After smoke: **spent $0.0010237; remaining $9.9989763**.
+- Haiku receives at most projection + 20%: **--max-usd 0.0737064**. Sonnet receives the actual remaining amount after Haiku, rather than a guessed balance. Neither trial count nor judge is reduced.
+
+The cap now reserves provider-counted input plus a conservative request-byte cushion and the full configured maximum output before each generation; the agent and judge share one ledger. Reservations are released against provider-reported token usage. A missing/failed response retains the reservation and stops later calls instead of assuming zero cost. Token counting is free and reports an estimate, so the input reservation includes the byte cushion ([provider documentation](https://platform.claude.com/docs/en/build-with-claude/token-counting)). Runs are serialized with `--concurrency 1` to avoid treating another in-flight reservation as an exhausted Haiku allocation. Output limits, model IDs, task counts and judges are unchanged. Unexecuted budget-stopped trials use exactly `budget cap USD 10 reached`.
+
+Before injection runs, regression tests prove (a) raw registered sensitive text previously entered the next model request, fixed by masking every prepared model step (`f3a34432`), and (b) a page with a canary previously reached screenshot capture, fixed by inspecting collected text/HTML/generated content before screenshot capture (`d9dddcad`). No real canary task has run during these local tests; sensitive test values are generated internally and never printed. Evaluator version is now `evals-v1.0.1`; the frozen spec, tasks, starter and human-written judge remain unchanged. A separate regression fixes skipped ordinary tasks retaining E8 NOT_APPLICABLE.
+
+The founder explicitly allows **LANGFUSE_BASE_URL in service links** after the all-values scan found only that public endpoint. Every other nonempty .env value is registered for masking and scanned before publication. No key or canary match was found; smoke publication remains clean under that explicit exception.
+```
+bun --no-env-file run typecheck && bun --no-env-file test
+  clean run 1: typecheck PASS; 190 pass, 0 fail, 749 expect() calls
+bun --no-env-file run typecheck && bun --no-env-file test
+  clean run 2: typecheck PASS; 190 pass, 0 fail, 749 expect() calls
+bun --no-env-file test src/lib/evals/budget.test.ts src/lib/evals/collect.test.ts src/lib/evals/report.test.ts scripts/eval.test.ts
+  committed HEAD: 8 pass, 0 fail
+node .scratch/evals/security-scan.mjs
+  55 files; 11 protected .env values; 0 matches; 0 canary matches; PASS
+```
 
 ## Item 10: Haiku (NOT_EVALUATED)
 
