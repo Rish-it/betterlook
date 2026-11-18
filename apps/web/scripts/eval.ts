@@ -1,7 +1,7 @@
 import {createHash, randomBytes} from 'node:crypto';
-import {mkdirSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {parseArgs} from 'node:util';
+import {parseArgs, parseEnv} from 'node:util';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createAnthropic} from '@ai-sdk/anthropic';
 import {createOpenAI} from '@ai-sdk/openai';
@@ -23,6 +23,7 @@ import {
 } from '../src/lib/evals/checks';
 import {HOOK_OUT, HOOK_PATH, HOOK_SHOT} from '../src/lib/evals/collect';
 import {judgeFor, JUDGE_INSTRUCTION, JUDGE_INSTRUCTION_SHA256, runJudge} from '../src/lib/evals/judge';
+import {AnthropicBudget, BUDGET_CAP_REASON} from '../src/lib/evals/budget';
 import {annotationQueueUrl, datasetUrl, E7_QUEUE, ensureAnnotationQueue, langfuse, langfuseConfigured, LangfuseError, postScores, projectId, traceUrl} from '../src/lib/evals/langfuse';
 import {compareToBaseline, costUsd, summarize, type NotRun, type RunRecord, type Summary} from '../src/lib/evals/report';
 import {CONFIG_HASH, DESIGN_MD_SHA256, installHook, readEvidence, readSnapshot, scoreTurn, verifyStatus, verifySummary} from '../src/lib/evals/turn';
@@ -52,6 +53,9 @@ const {values} = parseArgs({
 
 const sha256 = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 const cwd = process.env.INIT_CWD ?? process.cwd();
+const envFile = resolve(process.cwd(), '.env');
+const envValues = existsSync(envFile) ? Object.entries(parseEnv(readFileSync(envFile, 'utf8'))).filter(([name, value]) => value && name !== 'LANGFUSE_BASE_URL').map(([, value]) => value!) : [];
+envValues.forEach(registerSecret);
 if (values['annotation-queue']) {
   if (!langfuseConfigured()) throw new Error('Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY in apps/web/.env.');
   const queue = await ensureAnnotationQueue();
@@ -132,6 +136,8 @@ if (!sandboxConfigured()) blocked.push('Vercel sandbox credentials (VERCEL_TOKEN
 const confirmed = await confirmModel(modelId, process.env);
 if (!confirmed.ok) blocked.push(confirmed.reason);
 const judge = values['no-judge'] ? null : judgeFor(process.env);
+const budget = values['max-usd'] ? new AnthropicBudget(Number(values['max-usd'])) : null;
+if (budget && judge?.provider === 'anthropic') judge.model = createAnthropic({apiKey: process.env.ANTHROPIC_EVAL_API_KEY, fetch: budget.fetch})(judge.modelId);
 const judgeConfirmed = judge ? await confirmModel(judge.modelId, process.env) : null;
 const judgeBlocked = values['no-judge'] ? 'Code checks only (--no-judge).' : !judge ? 'No eval key for the E7 judge.' : !judgeConfirmed?.ok ? judgeConfirmed?.reason : null;
 writeJson('setup.json', {
@@ -375,7 +381,7 @@ async function evaluate(ctx: RunContext): Promise<RunRecord> {
 // ---------- Run ----------
 
 const credential = evalCredential(provider, process.env);
-const model = () => (provider === 'anthropic' ? createAnthropic({apiKey: credential.kind === 'api-key' ? credential.apiKey : ''})(modelId) : createOpenAI({apiKey: credential.kind === 'api-key' ? credential.apiKey : ''})(modelId));
+const model = () => (provider === 'anthropic' ? createAnthropic({apiKey: credential.kind === 'api-key' ? credential.apiKey : '', ...(budget ? {fetch: budget.fetch} : {})})(modelId) : createOpenAI({apiKey: credential.kind === 'api-key' ? credential.apiKey : ''})(modelId));
 const maxUsd = values['max-usd'] ? Number(values['max-usd']) : Infinity;
 let spent = 0;
 let capped = false;
@@ -420,11 +426,11 @@ const summaries = await runTasks({
   }),
   evaluate: async ctx => {
     const r = await evaluate(ctx);
-    spent += r.cost_usd ?? 0;
+    spent = budget ? budget.snapshot().spent_usd : spent + (r.cost_usd ?? 0);
     return r;
   },
   proceed: () => {
-    if (spent < maxUsd) return true;
+    if (!budget?.snapshot().capped && spent < maxUsd) return true;
     if (!capped) log(`Spend cap $${maxUsd} reached ($${spent.toFixed(4)}); no new runs start.`);
     capped = true;
     return false;
@@ -441,7 +447,7 @@ for (const t of tasks) {
   for (let trial = 1; trial <= k; trial++) {
     const s = summaries.find(x => x.taskId === t.id && x.run === trial);
     const ev = s?.evaluation as (RunRecord & {error?: string}) | undefined;
-    if (!s) notRun.push({task_id: t.id, trial_index: trial, reason: capped ? `Spend cap $${maxUsd} reached.` : 'Not executed (sandbox quota paused or the runner stopped early).'});
+    if (!s || (budget?.snapshot().capped && ev?.status === 'error' && ev.usage.inputTokens === 0 && ev.usage.outputTokens === 0)) notRun.push({task_id: t.id, trial_index: trial, reason: capped || budget?.snapshot().capped ? BUDGET_CAP_REASON : 'Not executed (sandbox quota paused or the runner stopped early).'});
     else if (!ev || ev.error) notRun.push({task_id: t.id, trial_index: trial, reason: `Scoring failed: ${ev?.error ?? 'no evaluation'}`});
     else {
       const turn = JSON.parse(readFileSync(join(s.dir, 'turn.json'), 'utf8')) as {sandbox: {activeCpuMs: number | null} | null};
@@ -452,6 +458,7 @@ for (const t of tasks) {
 
 // Every value that must never leave this machine: env secrets by name, and every canary planted in this process.
 const secrets = [
+  ...envValues,
   ...Object.entries(process.env).filter(([name, v]) => v && v.length >= 8 && /KEY|TOKEN|SECRET|PASSWORD|DATABASE_URL|DIRECT_URL/i.test(name)).map(([, v]) => v!),
   ...[...states.values()].flatMap(s => (s.canary ? [s.canary] : [])),
 ];
@@ -492,7 +499,8 @@ const baseline = values.baseline ? (() => {
   }
 })() : undefined;
 const comparison = baseline === undefined ? null : compareToBaseline(summary, baseline);
-writeJson('summary.json', {...summary, setup: {model: confirmed, judge: judge?.modelId ?? null, judge_blocked: judgeBlocked}, langfuse: lf ? {dataset: datasetUrl(lf.project, lf.datasetId), dataset_name: DATASET, experiment_name: runName, experiment_id: lf.experimentId, scores_posted: published} : null, scan: scanResult, comparison});
+const ledger = budget?.snapshot();
+writeJson('summary.json', {...summary, ...(ledger ? {total_cost_usd: ledger.reserved_usd > 1e-12 ? null : ledger.spent_usd, cost_per_completed_task_usd: ledger.reserved_usd > 1e-12 || !summary.completed_runs ? null : ledger.spent_usd / summary.completed_runs} : {}), budget: ledger ?? null, setup: {model: confirmed, judge: judge?.modelId ?? null, judge_blocked: judgeBlocked}, langfuse: lf ? {dataset: datasetUrl(lf.project, lf.datasetId), dataset_name: DATASET, experiment_name: runName, experiment_id: lf.experimentId, scores_posted: published} : null, scan: scanResult, comparison});
 
 for (const [id, e] of Object.entries(summary.per_eval)) {
   const c = e.trial_counts;
