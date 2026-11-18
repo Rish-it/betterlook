@@ -4,9 +4,11 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
 ## Checklist
 
-- [ ] Plan: use the agent-reach skill to compare E2B, Vercel Sandbox and Daytona (isolation, preview URL, file API, git support, startup time, cost). Write the comparison, your pick, the runAgent() flow in 5-10 lines, and a draft of lib/agent/types.ts (committed as the real file). Ask the founder: which sandbox, which first provider, and where the user's key lives (default: in the browser, sent per request, used for that call only, never stored server-side). Stop and wait.
+- [x] Plan: use the agent-reach skill to compare E2B, Vercel Sandbox and Daytona (isolation, preview URL, file API, git support, startup time, cost). Write the comparison, your pick, the runAgent() flow in 5-10 lines, and a draft of lib/agent/types.ts (committed as the real file). Ask the founder: which sandbox, which first provider, and where the user's key lives (default: in the browser, sent per request, used for that call only, never stored server-side). Stop and wait.
 
-  Research done, waiting on founder answers (see Questions). Sources: e2b.dev/pricing, docs.e2b.dev/billing, github.com/e2b-dev/infra ARCHITECTURE.md, vercel.com/docs/sandbox/pricing, vercel.com/docs/sandbox (concepts + working-with-sandbox + SDK reference), daytona.com/pricing, daytona.com/docs/preview, daytona.com/docs/file-system-operations. Gathered with agent-reach (Exa search), 2026-11-18.
+  Founder answers (2026-11-18, via orchestrator): sandbox **Vercel Sandbox**; first provider **OpenAI via `@ai-sdk/openai`** (Responses API, `store: false`, keeps `oauth` usable for ChatGPT sign-in); Anthropic is the "second provider is a small change"; user key in the browser, per request, never stored or logged server-side; no `.env` yet, so live proofs are marked LIVE PROOF PENDING ENV and listed under Pending e2e.
+
+  Research: Sources: e2b.dev/pricing, docs.e2b.dev/billing, github.com/e2b-dev/infra ARCHITECTURE.md, vercel.com/docs/sandbox/pricing, vercel.com/docs/sandbox (concepts + working-with-sandbox + SDK reference), daytona.com/pricing, daytona.com/docs/preview, daytona.com/docs/file-system-operations. Gathered with agent-reach (Exa search), 2026-11-18.
 
   | | E2B | Vercel Sandbox | Daytona |
   |---|---|---|---|
@@ -21,8 +23,8 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
   **runAgent() flow:**
   1. `runAgent({prompt, history, model, credential, sandboxId, abortSignal, onEvent})` in `lib/agent/run.ts`, called by `/api/chat` and by `scripts/agent-run.ts`.
-  2. Build the model from `credential` (`@ai-sdk/anthropic`, per-request `createAnthropic({apiKey | authToken})`), hash the system prompt and tool config.
-  3. `streamText({model, system, messages, tools, stopWhen: stepCountIs(config.maxSteps), maxOutputTokens, providerOptions: cache control, experimental_telemetry})`.
+  2. Build the model from `credential` (`@ai-sdk/openai`, per-request `createOpenAI({apiKey})`, Responses API with `store: false`), hash the system prompt and tool config.
+  3. `streamText({model, instructions, messages, tools, stopWhen: isStepCount(config.maxSteps), maxOutputTokens, providerOptions, telemetry})` (AI SDK v7 names).
   4. Each tool's `execute` first calls `checkPolicy(tool, args)`: deny returns a tool error to the model and records a `DeniedCall`; a protected path emits `awaiting-approval` and waits for approve/deny.
   5. On finish: `git commit` in the sandbox, giving the `Checkpoint`; run verify (tsc, build, preview console/page errors).
   6. If verify fails: one repair `streamText` with the errors, commit again, verify again; still failing means status `failed`, restore offered.
@@ -32,7 +34,17 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
   Evidence: `bun install --frozen-lockfile` (lockfile unchanged), then `bun run typecheck` run 1: pass, run 2: pass. No `.env` exists yet, so there is no secret to grep for.
 
-- [ ] Agent core, text only: lib/agent/types.ts committed; runAgent() streams replies into the chat panel; model picker, stop button and step limit work.
+- [x] Agent core, text only: lib/agent/types.ts committed; runAgent() streams replies into the chat panel; model picker, stop button and step limit work.
+
+  Built: `lib/agent/run.ts` (`runAgent()`: one `streamText` with `instructions`, `isStepCount(maxSteps)`, `maxOutputTokens`, `providerOptions.openai.store = false`, abort signal), `lib/agent/config.ts` (controls file: `maxSteps` 20, `maxOutputTokens` 8000; allowlist and path policy join it in later items), `lib/agent/system-prompt.ts` (**founder slot**: `SYSTEM_PROMPT = ''`, empty sends no instructions), `lib/agent/model.ts` (`providerOf`, `languageModel(modelId, credential)` via `createOpenAI`, `parseCredential` shape check), `app/api/chat/route.ts` (credential is `parseCredential(body.credential) ?? await getServerCredential(req)`, using the one-line stubs for AUTH in `route.ts` and `Workspace.tsx`), and `Workspace.tsx` minimal change: `useChat` with a `Chat` owned by the component (useChat's own instance is stopped by StrictMode's simulated unmount, which silently dropped the first send), real messages, plain error line, Stop button while busy. The landing prompt is sent once on mount with the picked model.
+  Deps: `@ai-sdk/openai@4.0.121` (first provider), `@ai-sdk/react@4.0.180` (`useChat`, pinned to `ai@7.0.176`), `@types/bun@1.4.4` dev (types for `bun:test`; TS 6 defaults `types` to empty, so the test file references them, and `tsconfig.json` is untouched). Scripts: `test` (`bun test`) in root and web `package.json`.
+  Evidence:
+  - `bun run typecheck` and `bun run test`, run 1: pass, run 2: pass (5 tests, `ai/test` `MockLanguageModelV4`): reply streams with configured `maxOutputTokens` and `store: false`; abort stops the stream mid-reply; a model that keeps calling tools stops at exactly `maxSteps` (20) steps; model-to-provider routing and mismatch rejection; credential shape validation (`api-key`, `oauth`, empty key, wrong provider, null).
+  - UI at :3400 with `/api/chat` mocked in the browser: `.screenshots/agent-core-reply-1440.png` (landing prompt plus streamed reply, GPT-5 label), `.screenshots/agent-core-stop-visible-1440.png` (Stop shown while pending), `.screenshots/agent-core-stopped-1440.png` (Stop clicked, request aborted, chat idle). Request bodies: `[{"model":"gpt-5","credential":null,"messages":1},{"model":"gpt-5","credential":null,"messages":3}]`.
+  - UI against the real route (no mock): `.screenshots/agent-core-unconnected-model-1440.png` ("claude-sonnet-5-5 is not connected yet."), then picker switched to GPT-5 and sent: `.screenshots/agent-core-real-route-errors-1440.png` ("Sign in or add an API key to start."). Requests carried `["claude-sonnet-5-5","gpt-5"]` (the picker drives the model); server log `POST /api/chat 400`, then `401`; the chat kept working after the error.
+  - React Doctor 100/100. No `.env` exists; `grep -rIE "sk-[A-Za-z0-9_-]{16,}" .screenshots apps/web/src` found no match.
+  - LIVE PROOF PENDING ENV: with an OpenAI key in the credential, send "hello" from `/workspace?model=gpt-5` and see a streamed reply, then press Stop mid-stream and see the server request abort.
+  - Known gap: a reload re-sends the landing prompt. Chat history and sandbox id move to localStorage in the Sandbox item.
 - [ ] BYOK: the key flows the way the founder picked; missing or wrong key shows a clear message.
 - [ ] Turn record and tracing: each turn lands in Langfuse with the required fields; prompt and tool config hashes change on edit; no secret appears in an exported trace.
 - [ ] Sandbox and preview: a fresh sandbox from a minimal React starter, initialized as a git repo; the preview shows it; reload reconnects to the same sandbox.
@@ -47,10 +59,24 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 - v1 (Plan item): `ProviderCredential` (`api-key` | `oauth` with `accessToken`), `ProviderId`, `ToolName`, `DeniedCall`, `ToolCallRecord`, `VerifyCheck`, `VerifyResult`, `Checkpoint`, `Usage`, `TurnStatus`, `TurnRecord`, `TurnEvent` (restore, keep, approve, deny). AUTH: an OAuth token goes in `{kind: 'oauth', accessToken}`; `ProviderId` widens when a second provider lands.
 - Dependency (orchestrator request, 2026-11-18): `ai@7.0.176` (exact) added to `apps/web/package.json`. This is **v7**, not v5: npm `latest` is 7.0.176, and v5 (5.0.291) and v6 are maintenance tags. `import type {UIMessage, ToolUIPart} from 'ai'` typechecks. The founder's brief named v5; the APIs it names (`streamText`, tools, `stopWhen` + `stepCountIs`, `useChat`) carry through v7, and `useChat` comes from `@ai-sdk/react`, which lands with the Agent core item. No provider package or sandbox SDK added. Evidence: `bun run typecheck` run 1: pass, run 2: pass.
 
+- `0dccdb9a` (orchestrator priority, for AUTH): `ProviderId = 'openai' | 'anthropic'`. OpenAI is the first provider; `anthropic` is reserved for the second.
+
 ## Questions for the founder
+
+Answered 2026-11-18 (see Plan). Open:
+
+- **AI-UI (via orchestrator):** the founder asked for an OpenAI model as the picker default. `MODELS` lives in `composer/models.ts` (AI-UI's file); please put an OpenAI model first. Until then the workspace says that non-OpenAI models are not connected yet.
+
+Original questions:
 
 1. **Sandbox:** Vercel Sandbox (my pick), E2B or Daytona? I need a Vercel team token (or OIDC via `vercel link`) in `.env` as `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID`. I won't create the account.
 2. **First provider:** Anthropic via `@ai-sdk/anthropic` (my pick: explicit prompt caching through `cacheControl`, and the picker already defaults to Claude), or OpenAI via `@ai-sdk/openai` (fits a ChatGPT-subscription credential if AUTH lands one)? Either way the second provider is one entry in a provider map.
 3. **Where the user's key lives:** I'll use your default unless you say otherwise: in the browser (localStorage), sent per request in a header, used for that call only, never stored, logged or traced server-side.
 4. **Eval key and Langfuse:** for later items I need, in `.env` (never shown to me in chat): `ANTHROPIC_EVAL_API_KEY` (or the OpenAI equivalent), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`.
 5. **System prompt slot:** this will be `apps/web/src/lib/agent/system-prompt.ts`, a one-line placeholder for you to fill in. It lands with the Agent core item.
+
+## Pending e2e
+
+Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
+
+- Agent core: streamed reply from a real OpenAI model at `/workspace?model=gpt-5`; Stop aborts the server request.
