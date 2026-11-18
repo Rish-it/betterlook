@@ -91,11 +91,11 @@ export default function AiDevPage() {
         </Section>
 
         <Section title="Prompt input">
-          <State label="idle, model selector">
-            <Fixture value={{model: f.fixtureModel, isStreaming: false}} />
+          <State label="idle: attach, model selector, send">
+            <Composer placeholder="Describe a change" model={f.fixtureModel} onSubmit={() => {}} />
           </State>
-          <State label="streaming: stop shown, input disabled">
-            <Fixture value={{model: f.fixtureModel, isStreaming: true}} />
+          <State label="streaming: input, attach and model disabled; stop shown">
+            <Composer placeholder="Describe a change" model={f.fixtureModel} isStreaming onStop={() => {}} onSubmit={() => {}} />
           </State>
         </Section>
 

@@ -3,7 +3,9 @@
 import {Selector} from '@astryxdesign/core/Selector';
 import {MODELS} from './models';
 
-export function ModelPicker({value, onChange}: {value: string; onChange(model: string): void}) {
+type ModelPickerProps = {value: string; onChange(model: string): void; isDisabled?: boolean};
+
+export function ModelPicker({value, onChange, isDisabled}: ModelPickerProps) {
   return (
     <Selector
       label="Model"
@@ -13,6 +15,7 @@ export function ModelPicker({value, onChange}: {value: string; onChange(model: s
       options={MODELS}
       value={value}
       onChange={onChange}
+      isDisabled={isDisabled}
     />
   );
 }

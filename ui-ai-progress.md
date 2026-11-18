@@ -63,9 +63,22 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
     - all borderless; no console errors; no horizontal scroll at 1280px
   - `bun run typecheck`: exit 0 on two clean runs.
   - `react-doctor`: I fixed the non-component export in `ToolCall.tsx`. Two `no-array-index-as-key` warnings remain in `Message.tsx`. I judged them false positives: `TextUIPart` has no id and a message's parts are append-only, so the index is their stable identity. Reasoning uses `part.id` when it has one. A one-line comment in the code records why.
-- [ ] Prompt input upgrade.
+- [x] Prompt input upgrade.
 
   - Orchestrator: the model list moves to AI-CORE's `lib/agent/models.ts` (plain data, OpenAI default first). When that is on `betterlook`, point `ModelPicker` at it and delete `composer/models.ts`. Until then, keep the current list.
+  - `composer/Composer.tsx`: `onSubmit(text, model, attachments: File[])`, plus `isStreaming?` and `onStop?`.
+    - Attach opens a hidden native `<input type="file" multiple>`; picked files show as removable `Token`s in a `ChatComposerDrawer` above the input, with duplicates ignored.
+    - Submitting passes the files and clears them.
+    - While streaming, the composer is `isDisabled`: input not editable, `aria-disabled="true"`, attach and model disabled. Its Stop button stays enabled and calls `onStop`.
+    - Callers on `/` and `/workspace` are unchanged (the extra argument is ignored).
+  - `composer/ModelPicker.tsx`: takes `isDisabled`. The model list stays in `composer/models.ts` until `lib/agent/models.ts` lands.
+  - Checked in the browser:
+    - 2 files attached, then 1 removed, leaves 1 token
+    - Enter submits and clears both the tokens and the text
+    - streaming composer: `contenteditable=false`, `aria-disabled=true`, Stop enabled
+    - landing composer still renders; no console errors
+  - Screenshots, checked by eye: `.screenshots/ai-04-composer-light.png` and `.screenshots/ai-04-composer-dark.png`, showing idle with two attachments and typed text, and streaming (dimmed, Stop shown). Borderless.
+  - `bun run typecheck`: exit 0 on two clean runs. `react-doctor`: only the two index-key warnings in `Message.tsx` already judged false positives in item 3.
 - [ ] Tool call row and denied call.
 - [ ] Approval card.
 - [ ] Verify result and diff view.
