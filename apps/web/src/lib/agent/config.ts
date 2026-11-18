@@ -11,7 +11,7 @@ export const AGENT_CONFIG = {
 } as const;
 
 export const RUNNER_CONFIG = {
-  concurrency: 2,
+  concurrency: 3,
   maxAttempts: 3,
   backoffMs: 5_000,
 } as const;

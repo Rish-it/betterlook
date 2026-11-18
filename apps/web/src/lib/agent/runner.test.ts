@@ -105,6 +105,13 @@ test('with a cap of 1, runs never overlap', async () => {
   expect(p.stats().maxInFlight).toBe(1);
 });
 
+test('agent:run never holds more than 3 sandboxes, whatever concurrency is asked for, and stops each one', async () => {
+  const p = projects();
+  const results = await runTasks({tasks: [{id: 'a', prompt: 'p'}, {id: 'b', prompt: 'q'}], runs: 4, concurrency: 10, outDir: outDir(), model: editingModel, project: p.project, capture: p.capture});
+  expect(results).toHaveLength(8);
+  expect(p.stats()).toEqual({maxInFlight: 3, inFlight: 0, stops: 8});
+});
+
 test('a rate-limited run backs off and retries on a fresh sandbox', async () => {
   spyOn(console, 'error').mockImplementation(() => {});
   const p = projects();

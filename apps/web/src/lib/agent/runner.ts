@@ -108,6 +108,7 @@ export async function runTasks({
       results.push(await runOnce(task, run, outDir, all));
     }
   };
-  await Promise.all(Array.from({length: Math.min(concurrency, jobs.length)}, worker));
+  const workers = Math.min(concurrency, RUNNER_CONFIG.concurrency, jobs.length);
+  await Promise.all(Array.from({length: workers}, worker));
   return results;
 }
