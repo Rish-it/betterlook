@@ -6,6 +6,7 @@ import {useChat} from '@ai-sdk/react';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
 import {Button} from '@astryxdesign/core/Button';
+import {Icon} from '@astryxdesign/core/Icon';
 import {HStack, VStack} from '@astryxdesign/core/Layout';
 import {
   ChatMessage,
@@ -67,6 +68,13 @@ let sandboxRequest: Promise<Preview> | null = null;
 type View = 'chat' | 'preview';
 
 const styles = stylex.create({
+  header: {
+    paddingInline: {default: spacingVars['--spacing-6'], [NARROW]: spacingVars['--spacing-3']},
+  },
+  title: {
+    minWidth: 0,
+    maxWidth: {default: 360, [NARROW]: 144},
+  },
   body: {
     display: 'flex',
     flexDirection: 'column',
@@ -378,9 +386,16 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
       topNav={
         <TopNav
           label="Workspace"
-          heading={title}
+          xstyle={styles.header}
+          heading={
+            <HStack gap={3} align="center">
+              <Button label="Back" tooltip="Back to home" href="/" variant="ghost" size="sm" icon={<Icon icon="chevronLeft" />} />
+              <Text weight="semibold" maxLines={1} xstyle={styles.title}>{title || UNTITLED}</Text>
+            </HStack>
+          }
           endContent={
-            <HStack gap={2} align="center">
+            <HStack gap={2} align="center" wrap="wrap">
+              <Button label="New project" href="/" variant="secondary" size="sm" />
               <ModelPicker value={model} onChange={setModel} />
               {!hasBuilt && <AuthControls />}
             </HStack>
