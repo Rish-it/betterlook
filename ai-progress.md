@@ -66,7 +66,33 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
   - The route still works under Next with telemetry imported: BYOK browser check reran, `[agent] model call failed: 401`, `POST /api/chat 200`, then `401`.
   - No `.env` exists; the secret grep found no match (above).
   - LIVE PROOF PENDING ENV: with Langfuse keys and an OpenAI key in `apps/web/.env`, send one message; the Langfuse trace shows `betterlook.turn` with nested model spans, metadata `systemPromptHash`/`toolConfigHash`, the turn record as output, and computed cost. Then edit `system-prompt.ts`, send again, and the `systemPromptHash` differs. Export the trace JSON and grep it for each `.env` value: no match.
-- [ ] Sandbox and preview: a fresh sandbox from a minimal React starter, initialized as a git repo; the preview shows it; reload reconnects to the same sandbox.
+- [x] Sandbox and preview: a fresh sandbox from a minimal React starter, initialized as a git repo; the preview shows it; reload reconnects to the same sandbox.
+
+  Built: `lib/sandbox/starter.ts` (a minimal Vite + React + TS app: hero heading, copy and button; `dev`, `build` and `typecheck` scripts; dev server on 5173 with `allowedHosts: true` and `cors: true`). `lib/sandbox/sandbox.ts`:
+  - `createSandbox()`: Vercel Sandbox `node24` with port 5173 → writes the starter → `npm install` → `git init` plus a local identity → `git add -A` → `git commit -m starter`, which includes the lockfile → `npm run dev` detached → returns `{sandboxId, previewUrl}`.
+  - `connectSandbox(id)`: `Sandbox.get({name, resume: true, onResume})`, which restarts the dev server when a stopped sandbox resumes.
+  - Credentials: `VERCEL_TOKEN`/`VERCEL_TEAM_ID`/`VERCEL_PROJECT_ID`, or OIDC. Nothing from our env is passed into the sandbox.
+  `app/api/sandbox/route.ts`: POST `{sandboxId}` reconnects, or creates a fresh sandbox if the old one is gone. It returns 503 "The preview sandbox is not configured yet." without credentials, and 502 "The preview sandbox could not start. Reload to try again." on failure; the log carries the message only.
+  `Workspace.tsx` (minimal): one sandbox request per page load; sandbox id and chat history in localStorage (`betterlook.sandboxId`, `betterlook.chat`). Arriving with `?prompt=` starts a new project: storage is cleared, the prompt is sent, and the URL is rewritten to `/workspace?model=…`, so a reload restores the history and reconnects instead of re-sending. The iframe shows the sandbox URL, and an error shows in the preview toolbar.
+  Fixed on the way:
+  - **Shell bug:** the preview section's `display: flex` was wiped on desktop by `hiddenWhenNarrow` (`display: {default: null}`), so the iframe stayed at the 150px default height. `previewHiddenWhenNarrow` now keeps `flex` on desktop and `none` when narrow.
+  - **Iframe scripts:** the opaque-origin iframe (`sandbox` without `allow-same-origin`) needs Vite `cors: true` to load module scripts.
+  Dep: `@vercel/sandbox@4.0.0` (the founder's sandbox pick).
+  Evidence:
+  - `bun run typecheck` + `bun run test` run 1: pass, run 2: pass (15 tests). `sandbox.test.ts` with a fake Sandbox API checks four things:
+    - the exact create sequence (create → write all starter files → install → git init/config/add/commit → detached dev);
+    - a failed `npm install` stops before git;
+    - reconnect calls `get(name, resume: true)` and restarts dev;
+    - the route returns 503 when not configured.
+  - Starter, real run in the scratchpad: `npm install` (23 packages), `git commit` gives `9e3a91e starter`, `npm run typecheck` passes, `npm run build` passes (`dist/assets/index-*.js 219.81 kB`), `vite` serves it.
+  - Real SDK under Next with deliberately fake Vercel vars: `[sandbox] start failed: Status code 403 is not ok: Not authorized`, `POST /api/sandbox 502`. The fake token appears 0 times in the log.
+  - UI, with `/api/sandbox` answered by the test browser pointing at the local starter: `.screenshots/sandbox-preview-1440.png` (starter rendered full height in the preview; URL rewritten to `/workspace?model=gpt-5`); `.screenshots/sandbox-reload-reconnect-1440.png` (after reload, history restored, same model, preview back). Sandbox request bodies: `[{"sandboxId":null},{"sandboxId":"sbx-local-1"}]`; `/api/chat` called once in total, so the reload did not re-send.
+  - Unconfigured, real route: `.screenshots/sandbox-not-configured-1440.png` (toolbar reads "The preview sandbox is not configured yet.", placeholder kept).
+  - Narrow 390px: `.screenshots/sandbox-narrow-chat-390.png` (preview hidden), `.screenshots/sandbox-narrow-preview-390.png` (chat hidden, starter rendered).
+  - React Doctor 73/100, one warning: `no-fetch-in-effect` (Workspace.tsx sandbox effect). **Waived with evidence:** the rule's own page says "Suppress when: a one-shot fetch with proper cleanup in a small project that has not adopted a data-fetching library". The request is one-shot, deduplicated per page load (one request per load under StrictMode, shown above), and its state update is guarded on unmount. It is not aborted on purpose, since aborting would cancel sandbox creation. Adding react-query for one call goes against minimal deps. The two other warnings it raised (unguarded async set-state; `.then` without catch) are fixed.
+  - Secret grep over `.screenshots/*.log` and `apps/web/src`: no match.
+  - LIVE PROOF PENDING ENV: with Vercel credentials, open `/` and send a prompt. `/api/sandbox` creates a sandbox, the preview iframe shows the starter from `*.vercel.run`, and `git log` in the sandbox shows `starter`. Reload `/workspace`: the same `sandboxId` is sent and the same preview returns. Stop the sandbox, then reload: it resumes and the dev server restarts.
+  - Fragile, noted for the runner item: `@vercel/sandbox` cannot load under Bun (Bun's built-in `undici` lacks `Dispatcher1Wrapper`); it loads under Node, so Next is fine. `sandbox.ts` imports it lazily so Bun tests inject a fake. `agent:run` will need to run under Node.
 - [ ] Tools and policy: the allowlisted tools work; a call outside the project folder is denied, logged and returned to the model as a tool error; a package.json edit pauses for approval.
 - [ ] Checkpoint and verify: commit per turn, verify after each turn, one repair attempt, failed-turn state, restore works, events logged.
 - [ ] Headless runner: agent:run on a two-task sample file from the founder produces complete run folders, 2 runs each, through the same runAgent().
@@ -83,6 +109,8 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 - Allowed models (orchestrator correction): `apps/web/src/lib/agent/models.ts` exports `MODELS: {id, label, provider}[]` as plain data, safe to import on the client (type-only import of `ProviderId`). OpenAI default first: `gpt-5.5`, then `gpt-5` (both are ids `@ai-sdk/openai@4.0.121` knows; founder can edit the list). `/api/chat` rejects any model not in it (`providerOf` looks it up). AI-UI's picker imports it; `composer/` is untouched.
 
 - Tracing item: `TurnRecord.provider` is now `string`, the AI SDK provider id such as `openai.responses`, instead of `ProviderId`. `runAgent()` returns `{result, turn}`, where `turn` is a `Promise<TurnRecord>`.
+
+- `7449b371` orchestrator request (for AI-UI): `VerifyCheck.ok: boolean` is replaced by `status: VerifyCheckStatus` (`'passed' | 'failed' | 'skipped'`), so a runtime check skipped because the build failed no longer reads as a failure. `VerifyResult.ok` stays the overall pass.
 
 ## Questions for the founder
 
@@ -102,6 +130,7 @@ Original questions:
 
 Live checks that need the founder's `.env` (OpenAI eval key, Vercel token, Langfuse keys).
 
+- Sandbox: real Vercel sandbox from the landing prompt, the preview shows the starter, a reload reconnects to the same sandbox, and a stopped sandbox resumes with the dev server restarted.
 - Tracing: a Langfuse trace per turn with nested model spans, hashes in metadata, record as output, cost computed; hash changes after a prompt edit; exported trace JSON has no `.env` value.
 - BYOK: valid key streams; missing key and revoked key show the two messages (needs AUTH's `getCredential()` and a real key).
 - Agent core: streamed reply from a real OpenAI model at `/workspace?model=gpt-5`; Stop aborts the server request.
