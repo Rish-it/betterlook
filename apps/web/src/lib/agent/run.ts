@@ -101,6 +101,7 @@ export function runAgent({
     verify: null,
     repairAttempted: false,
     repairVerify: null,
+    stepLimitReached: false,
     status: 'running',
     checkpoint: null,
     startedAt: new Date().toISOString(),

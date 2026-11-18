@@ -226,6 +226,8 @@ Worker: AI-CORE (the AI layer). Branch: `ai-core`. Dev server port 3400.
 
 - Runner item, new exports: `lib/agent/runner.ts` (`parseTasks`, `evalCredential`, `runTasks`, `previewScreenshot`, `Task`, `RunSummary`), `RUNNER_CONFIG` in `config.ts`, `Project.readBytes`, and `RATE_LIMITED` in `errors.ts` (a 429 now gets its own message: "The model provider is rate limiting requests. Wait a minute and try again.").
 
+- Failure-states item, types: `AgentMetadata` gains `status?: TurnStatus` and `notice?: string`. Every turn now ends by writing assistant message metadata `{status, notice?}`, and `notice` is the readable sentence to show for that outcome. `TurnRecord` gains `stepLimitReached: boolean`.
+
 ## Questions for the founder
 
 Answered 2026-11-18 (see Plan). Open:

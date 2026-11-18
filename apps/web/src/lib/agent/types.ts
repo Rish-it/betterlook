@@ -75,6 +75,7 @@ export interface TurnRecord {
   verify: VerifyResult | null;
   repairAttempted: boolean;
   repairVerify: VerifyResult | null;
+  stepLimitReached: boolean;
   status: TurnStatus;
   error?: string;
   checkpoint: Checkpoint | null;
@@ -112,6 +113,8 @@ export interface AgentMetadata {
   model?: string;
   turnId?: string;
   traceId?: string;
+  status?: TurnStatus;
+  notice?: string;
 }
 
 export type AgentMessage = UIMessage<AgentMetadata, AgentDataParts>;
