@@ -2,6 +2,22 @@
 
 Worker: EVALS, branch `evals-v1` (cut from `betterlook` `a466a8a6`). Spec: `evals/EVALS.md` (frozen, SHA-256 `36d8f183d42c9b3c35c347fa429774c421fb4e1d3ead0f2b549704ca97949f0f`). `PROBLEM.md` wins on any conflict.
 
+## Hand-off (2026-11-18, EVALS-BASELINE)
+
+Current worker: CODEX-EVALS on `evals-baseline`, from `393d3696`. The current instruction authorizes README edits and real Langfuse/sandbox runs, superseding the earlier ownership and no-run restrictions below. Items 9–12 remain unchecked. **No model task execution, dataset, experiment, score, annotation queue or blind E7 export was created in this attempt.**
+
+Completed fixes: `ed0c8894` isolates every test-project Git call from inherited Git repository/worktree/index variables; `b3629eb0` adds `--task <id>`. Both include regression tests that failed before the fix, passed in two separate verification runs with typecheck, and passed again from committed HEAD.
+
+**Current blocker:** Vercel's starter base `betterlook-starter-1eeff41a8ee2` is stopped and has no snapshot. Existing `createProject()` cannot resume it: `APIError`, HTTP 400, `Cannot resume sandbox: no snapshot available`. Read-only API inspection confirms `snapshots: []` and **8,895 ms active CPU** on that failed base setup. There is no evidence of quota pause. Permission to delete only this failed external sandbox was requested; no deletion was performed. The founder's “Nothing outside this repository gets created, changed or deleted without my yes” rule requires that approval before reset. No GitHub write occurred.
+
+Both requested model IDs are confirmed exactly by the provider models API (HTTP 200): `claude-haiku-5-5`, `claude-sonnet-5-5`. Langfuse project authentication works. All required key names are present; `OPENAI_EVAL_API_KEY` is absent. No key values were printed. Full unit suite and typecheck pass twice (183 tests).
+
+After an approved reset, rerun item 9's browser preflight and then:
+```
+bun run eval --tasks evals/tasks/v1.md --task copy-edit --runs 1 --model claude-haiku-5-5 --out .scratch/evals/smoke
+```
+Do not tick item 9 until that smoke completes, publication and the exact Langfuse links are verified, and Linux E4f and CPU are measured. `fallbacks: 'default'` is unchanged: no model call occurred to prove incompatibility. E4f is NOT_EVALUATED because Linux Chromium has not started; its check is unchanged. The 8,895 ms failed setup CPU is separate from future task CPU and is not a successful snapshot rebuild measurement. Starter pricing, frozen spec/tasks, system prompt and UI files are unchanged.
+
 ## Hand-off (2026-11-18, founder change of plan)
 
 Items 1–8 are done and committed on `evals-v1`, proven with unit tests and dry runs that call no model, create no sandbox and write nothing to Langfuse. This session stopped before item 9 on the founder's instruction: **no smoke, Haiku or Sonnet run has happened, no Langfuse dataset, experiment, score or annotation queue exists yet, and no result below item 8 is real.** Every benchmark number is still NOT_EVALUATED. README.md belongs to the orchestrator on `betterlook`; this branch does not touch it.
@@ -339,6 +355,87 @@ bun run eval --tasks evals/tasks/v1.md --tag regression --runs 1 --model claude-
   → expected_executions 4 (copy-edit, hero-change, injection-readme, benign-comment), judge "off (code checks only)", max_usd 2
 bun test src/lib/evals/report.test.ts → "Trigger C: E8 high hits and new E1/E2 failures fail; a missing baseline is NOT_EVALUATED"
 ```
+
+## Flagged fixes (EVALS-BASELINE)
+
+1. Git environment leak: regression launches a child with all three inherited Git paths pointing at a disposable other repository. Before the fix, `core.bare` changed false → true and its user name changed; after the fix, config and index are byte-identical and the new project's HEAD contains its own file.
+```
+bun --no-env-file test apps/web/src/lib/agent/test-project.test.ts
+  RED: 0 pass, 1 fail — other repository config changed
+  GREEN run 1: 1 pass, 0 fail; bun --no-env-file run typecheck → clean
+  GREEN run 2: 1 pass, 0 fail; bun --no-env-file run typecheck → clean
+  committed HEAD ed0c8894: 1 pass, 0 fail
+```
+2. One-task CLI: regression executes the real CLI with `--task copy-edit --runs 1 --dry-run`, checks one expected execution and the unchanged full taskset hash. Unknown/filtered-out tasks error instead of silently running zero tasks.
+```
+bun --no-env-file test apps/web/scripts/eval.test.ts
+  RED: ERR_PARSE_ARGS_UNKNOWN_OPTION, Unknown option '--task'
+  GREEN run 1: 1 pass, 0 fail; bun --no-env-file run typecheck → clean
+  GREEN run 2: 1 pass, 0 fail; bun --no-env-file run typecheck → clean
+  committed HEAD b3629eb0: 1 pass, 0 fail
+```
+3. Haiku `fallbacks` compatibility: NOT_EVALUATED. Sandbox creation fails before a model call. No speculative change to `run.ts`; no substitute model.
+4. Linux E4f: NOT_EVALUATED. Browser cannot start before sandbox setup succeeds; no computed-property result is claimed.
+5. CPU: failed base setup 8,895 ms, measured by SDK `Sandbox.get({name: BASE_NAME, ...credentials})` without resume, `activeCpuUsageMs`. No task CPU exists to project. Keep setup CPU separate when item 9 resumes.
+
+## Item 9: preflight (incomplete)
+
+```
+cd apps/web
+bun install                          → 402 packages installed
+./node_modules/.bin/next typegen      → Types generated successfully
+cd ../..
+bun --no-env-file test                → run 1: 183 pass, 0 fail, 726 expect() calls
+bun --no-env-file run typecheck       → run 1: tsc --noEmit, clean
+bun --no-env-file test                → run 2: 183 pass, 0 fail, 726 expect() calls
+bun --no-env-file run typecheck       → run 2: tsc --noEmit, clean
+```
+Tests explicitly disable automatic .env loading. Model confirmation uses Node with the eval env loaded internally, sends the key only to the provider, and prints only requested/resolved IDs, HTTP status and error class:
+```
+GET https://api.anthropic.com/v1/models/claude-haiku-5-5
+  requested_id=claude-haiku-5-5 confirmed=true resolved_id=claude-haiku-5-5 http_status=200
+GET https://api.anthropic.com/v1/models/claude-sonnet-5-5
+  requested_id=claude-sonnet-5-5 confirmed=true resolved_id=claude-sonnet-5-5 http_status=200
+```
+Local evidence: `.scratch/evals/model-preflight.json`.
+
+Browser/credential preflight uses the existing `createProject`, collector and check library, without a model or screenshots:
+```
+bun build .scratch/evals/preflight.ts --target=node --packages=external --outfile=apps/web/node_modules/.cache/eval-preflight.mjs
+node --env-file=apps/web/.env apps/web/node_modules/.cache/eval-preflight.mjs
+  langfuse_credentials=PASS
+  attempt 1: TypeError before a project is returned
+  attempt 2: APIError, HTTP 400, Cannot resume sandbox: no snapshot available
+bun build .scratch/evals/sandbox-inspect.ts --target=node --packages=external --outfile=apps/web/node_modules/.cache/eval-inspect.mjs
+node --env-file=apps/web/.env apps/web/node_modules/.cache/eval-inspect.mjs
+  base_name=betterlook-starter-1eeff41a8ee2 status=stopped
+  snapshots=[]
+  base_active_cpu_ms=8895
+```
+No smoke run completed, no Langfuse dataset/experiment/queue link exists from this attempt, and no E4f evidence, task CPU, 84-run projection or quota-risk estimate exists. The failed setup CPU is reported separately. Item 9 is not ticked.
+
+## Item 10: Haiku (NOT_EVALUATED)
+
+Not started because item 9 is incomplete. Executed/expected **0/60**; 60 unstarted executions, zero executed task errors. All applicable scores are NOT_EVALUATED for sandbox setup; no alternative model was used. Planned command remains `bun run eval --tasks evals/tasks/v1.md --runs 5 --model claude-haiku-5-5`.
+
+## Item 11: Sonnet (NOT_EVALUATED)
+
+Not started because item 9 is incomplete. Executed/expected **0/24**; 24 unstarted executions, zero executed task errors. All applicable scores are NOT_EVALUATED for sandbox setup. Planned command remains `bun run eval --tasks evals/tasks/v1.md --runs 2 --model claude-sonnet-5-5`.
+
+## Item 12: scoring and exports (incomplete)
+
+README records the preflight date, exact confirmed IDs, taskset/config/DESIGN.md hashes and all model × eval denominators. No rates are represented as measured. E1–E7: Haiku 60/60 and Sonnet 24/24 NOT_EVALUATED per eval. E8: Haiku 15/60 NOT_EVALUATED + 45/60 NOT_APPLICABLE; Sonnet 6/24 NOT_EVALUATED + 18/24 NOT_APPLICABLE. All PASS and FAIL counts are zero. Applicable-task pass@1 and pass^k numerators are zero of 12 tasks (E8: three), with missing evidence never counted as passing.
+
+Actual failures available for review: **0 traces**. No top-three ranking or reviews are fabricated. Blind E7 export: **0/20 available**, no export created, no human labels supplied. Dataset, both experiments and annotation queue were not created; links are unavailable and none is constructed by hand. Observed E8 high hits/false refusals, E7 same_family, actual USD total, cost/completed task and added_verify_ms are NOT_EVALUATED. No model task ran; only failed sandbox setup CPU is measured. The configured baseline uses an empty system prompt plus DESIGN.md context; no baseline ran.
+
+Security proof before the report commit:
+```
+node .scratch/evals/security-scan.mjs && git diff --check
+  run 1: files_scanned=15 env_values_checked=12 env_matches=0 canary_matches=0 canaries_planted=0 result=PASS
+node .scratch/evals/security-scan.mjs && git diff --check
+  run 2: files_scanned=15 env_values_checked=12 env_matches=0 canary_matches=0 canaries_planted=0 result=PASS
+```
+The scanner parses all nonempty `.env` values internally, compares exact bytes against every branch-changed file and local preflight/log artifact, and prints counts only. It also scans for the canary format; no canary was generated because no task ran. This proves the current artifacts only, not sanitization of future baseline outputs or screenshots. No run records or exports are committed. Frozen spec and task SHA-256 values match the handoff.
 
 ## Round log
 
