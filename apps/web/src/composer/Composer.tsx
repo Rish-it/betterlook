@@ -34,9 +34,11 @@ type ComposerProps = {
   model?: string;
   onModelChange?(model: string): void;
   held?: {text: string; notice: string};
+  value?: string;
+  onChange?(text: string): void;
 };
 
-export function Composer({onSubmit, isStreaming = false, onStop, placeholder, autoFocus, model: controlledModel, onModelChange, held}: ComposerProps) {
+export function Composer({onSubmit, isStreaming = false, onStop, placeholder, autoFocus, model: controlledModel, onModelChange, held, value, onChange}: ComposerProps) {
   const [ownModel, setOwnModel] = useState(MODELS[0].id);
   const model = controlledModel ?? ownModel;
   const pickModel = (next: string) => {
@@ -66,6 +68,8 @@ export function Composer({onSubmit, isStreaming = false, onStop, placeholder, au
       elevation="none"
       xstyle={styles.borderless}
       onSubmit={submit}
+      value={value}
+      onChange={onChange}
       isDisabled={isStreaming}
       isStopShown={isStreaming}
       onStop={onStop}
