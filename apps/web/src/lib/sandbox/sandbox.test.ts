@@ -2,7 +2,7 @@
 import {expect, spyOn, test} from 'bun:test';
 import {POST} from '@/app/api/sandbox/route';
 import {SANDBOX_CONFIG} from '@/lib/agent/config';
-import {BASE_NAME, connectSandbox, createProject, createSandbox, openProject} from './sandbox';
+import {BASE_NAME, connectSandbox, createProject, createSandbox, openProject, sandboxConfigured} from './sandbox';
 import {PREVIEW_PORT, STARTER_FILES} from './starter';
 
 const STARTER_SETUP = [
@@ -152,6 +152,33 @@ test('the sandbox route says so when it is not configured', async () => {
   const res = await POST(new Request('http://x/api/sandbox', {method: 'POST', body: JSON.stringify({sandboxId: null})}));
   expect(res.status).toBe(503);
   expect(await res.text()).toBe('The preview sandbox is not configured yet.');
+});
+
+test('on Vercel the SDK uses its own OIDC credentials; elsewhere the token triple is passed', async () => {
+  const saved = {...process.env};
+  const triple = {VERCEL_TOKEN: 'fake-token', VERCEL_TEAM_ID: 'team_x', VERCEL_PROJECT_ID: 'prj_x'};
+  const createParams = async () => {
+    const {api, calls} = fakeApi({snapshots: [{id: 'snap-ready', status: 'created'}]});
+    await createSandbox(api);
+    return JSON.parse(calls.find(c => c.startsWith('create '))!.slice('create '.length));
+  };
+  try {
+    for (const key of ['VERCEL', 'VERCEL_OIDC_TOKEN', ...Object.keys(triple)]) delete process.env[key];
+    expect(sandboxConfigured()).toBe(false);
+
+    process.env.VERCEL = '1';
+    expect(sandboxConfigured()).toBe(true);
+    expect(await createParams()).not.toHaveProperty('token');
+
+    Object.assign(process.env, triple);
+    expect(await createParams()).not.toHaveProperty('token');
+
+    delete process.env.VERCEL;
+    expect(sandboxConfigured()).toBe(true);
+    expect(await createParams()).toMatchObject({token: 'fake-token', teamId: 'team_x', projectId: 'prj_x'});
+  } finally {
+    process.env = saved;
+  }
 });
 
 test('the agent works on the resumed sandbox, rooted at its working directory', async () => {
