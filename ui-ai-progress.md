@@ -65,7 +65,15 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
   - `react-doctor`: I fixed the non-component export in `ToolCall.tsx`. Two `no-array-index-as-key` warnings remain in `Message.tsx`. I judged them false positives: `TextUIPart` has no id and a message's parts are append-only, so the index is their stable identity. Reasoning uses `part.id` when it has one. A one-line comment in the code records why.
 - [x] Prompt input upgrade.
 
-  - Orchestrator: the model list moves to AI-CORE's `lib/agent/models.ts` (plain data, OpenAI default first). When that is on `betterlook`, point `ModelPicker` at it and delete `composer/models.ts`. Until then, keep the current list.
+  - Model list move done after the orchestrator gave AI-UI `workspace/Workspace.tsx`. Merged `betterlook` 7058fc73 and kept AI-CORE's sandbox and localStorage logic.
+    - `ModelPicker`, `Composer`, `Message` and `Workspace` all import `MODELS` from `@/lib/agent/models` and match on `m.id`. `composer/models.ts` is deleted.
+    - `Workspace` passes `isStreaming={isBusy}` and `onStop={stop}` to `Composer` and no longer has its own Stop button.
+  - Live check on `/workspace?prompt=Make+the+nav+sticky&model=gpt-5`, with Playwright stubbing `/api/chat` (a delayed UI message stream) and `/api/sandbox`, and no real key:
+    - while the first send is in flight: input `contenteditable=false`, composer Stop shown, no other Stop button
+    - Stop aborts it; the input is editable again
+    - a second send streams "Mock reply…"; both requests carried `model: gpt-5`; no console errors
+    - screenshots: `.screenshots/ai-04-live-{light,dark}-streaming.png` and `-done.png`
+  - `react-doctor` also flags `Workspace.tsx:182` ("data fetching inside an effect"): AI-CORE's sandbox request, kept as the orchestrator asked.
   - `composer/Composer.tsx`: `onSubmit(text, model, attachments: File[])`, plus `isStreaming?` and `onStop?`.
     - Attach opens a hidden native `<input type="file" multiple>`; picked files show as removable `Token`s in a `ChatComposerDrawer` above the input, with duplicates ignored.
     - Submitting passes the files and clears them.
@@ -113,7 +121,7 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
     - Collapsed by default: "2 files changed +3 −1" on a muted tone.
     - Expanded: one diff block per file, the file path as the block title and its +/− counts in the header, hunks only, with added and removed lines tinted.
     - I dropped the planned `files` prop. The counts and paths all come from the diff, and `filesTouched` would only add files with no diff body.
-  - Pending (orchestrator): AI-CORE is replacing `VerifyCheck.ok` with `status: 'passed' | 'failed' | 'skipped'`. When that lands on `betterlook`, render skipped as neutral (not red), leave it out of the "X failed" summary, and change the `buildFailed` fixture's runtime check to skipped.
+  - `VerifyCheck.status` (merged from `betterlook` 7058fc73): a skipped check shows a neutral info icon and the word "skipped" in place of a duration, and stays out of the summary. `buildFailed` now reads "Build failed", not "Build, Runtime failed". Fixtures use `status`. Re-shot `.screenshots/ai-07-verify-diff-{light,dark}.png`.
   - `components/ai/diff.ts` (`parseDiff`, `hunks`) and `diff.test.ts`: splits a unified diff per file, counts lines, keeps the hunks only, and uses the old path for a deleted file. `bun test`: 4 pass.
   - Orchestrator nit fixed (applies to the approval card too): highlighted +/− lines now run the full width of the block. The block is now `width="100%"`, and a diff gets a `title`, so Copy moves into the header rather than taking a column beside the code. Measured: highlighted rows end 0px from the right edge of their code block. The approval card's diff also drops the `---`/`+++` lines (its title already names the file).
   - Bug caught: Astryx `Collapsible` defaults to `defaultIsOpen: true`. Verify and diff now pass `false`, so a fresh load shows all six collapsed (`aria-expanded=false`). Clicking expands only the one clicked.
@@ -155,8 +163,8 @@ Worker AI-UI: agent UI components in `apps/web/src/components/ai/**`, `apps/web/
 
 1. Map above: OK to proceed?
 2. For AI-CORE, through the orchestrator: the `ai` dependency (for `UIMessage` and `ToolUIPart`). types.ts v1 is merged.
-3. Model list move (merged `betterlook` 1aa4c1c3, clean, typecheck passes). Two things block it, and both touch `workspace/Workspace.tsx`, which is AI-CORE's file until my wire-up item:
+3. Answered (orchestrator): AI-UI owns `Workspace.tsx` and made changes (a) and (b); see item 4. Original question: model list move (merged `betterlook` 1aa4c1c3, clean, typecheck passes). Two things block it, and both touch `workspace/Workspace.tsx`, which is AI-CORE's file until my wire-up item:
    - `Workspace.tsx` imports `MODELS` from `@/composer/models` (lines 27, 119, 183) and reads `m.value`. `lib/agent/models.ts` uses `{id, label, provider}`. Deleting `composer/models.ts` breaks typecheck in `Workspace.tsx`. Pointing only `ModelPicker` at the new list leaves the workspace's initial-model check on the old Claude/Gemini ids, so the picker and the sent model disagree.
    - `Workspace.tsx` renders its own Stop `Button` and does not pass `isStreaming={isBusy}` / `onStop={stop}` to `Composer`. The composer's built-in stop and disabled state therefore can't be re-checked against the live workspace until those props are passed.
    Proposal: AI-CORE makes two small changes in `Workspace.tsx`, (a) import `MODELS` from `@/lib/agent/models` and use `m.id`, and (b) pass `isStreaming={isBusy} onStop={stop}` to `Composer` and drop its separate Stop button. I then switch `ModelPicker`, `Composer` and `Message` to `lib/agent/models.ts` and delete `composer/models.ts` in the same change. Alternatively, let me make (a) and (b) in `Workspace.tsx` myself now. Which one?
-4. For the wire-up item, not blocking now: how will a policy-denied call reach the UI? AI-CORE's plan returns it to the model as a tool error. If it arrives as an ordinary `output-error` tool part, the chat can't tell it from a real error. A `DeniedCall` on the turn, or a data part, would let me render `DeniedCall` instead.
+4. Answered (orchestrator): AI-CORE adds `AgentDataParts` and `AgentMessage`, and its stream writes a `data-denied` part next to the tool error; wire-up renders `DeniedCall` from that once it lands. Original question: how will a policy-denied call reach the UI? AI-CORE's plan returns it to the model as a tool error. If it arrives as an ordinary `output-error` tool part, the chat can't tell it from a real error. A `DeniedCall` on the turn, or a data part, would let me render `DeniedCall` instead.

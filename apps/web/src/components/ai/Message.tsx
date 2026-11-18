@@ -4,7 +4,7 @@ import {ChatMessage, ChatMessageBubble} from '@astryxdesign/core/Chat';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Markdown} from '@astryxdesign/core/Markdown';
 import {Text} from '@astryxdesign/core/Text';
-import {MODELS} from '@/composer/models';
+import {MODELS} from '@/lib/agent/models';
 import {ToolCall, type ToolPart} from './ToolCall';
 
 const styles = stylex.create({
@@ -16,7 +16,7 @@ const isToolPart = (part: UIMessage['parts'][number]): part is ToolPart =>
 
 function modelLabel(metadata: unknown) {
   const model = (metadata as {model?: unknown} | undefined)?.model;
-  return MODELS.find(m => m.value === model)?.label;
+  return MODELS.find(m => m.id === model)?.label;
 }
 
 function Reasoning({part}: {part: ReasoningUIPart}) {

@@ -8,7 +8,7 @@ import {Token} from '@astryxdesign/core/Token';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Icon} from '@astryxdesign/core/Icon';
 import {ModelPicker} from './ModelPicker';
-import {MODELS} from './models';
+import {MODELS} from '@/lib/agent/models';
 
 const styles = stylex.create({
   borderless: {
@@ -36,7 +36,7 @@ type ComposerProps = {
 };
 
 export function Composer({onSubmit, isStreaming = false, onStop, placeholder, autoFocus, model: controlledModel, onModelChange}: ComposerProps) {
-  const [ownModel, setOwnModel] = useState(MODELS[0].value);
+  const [ownModel, setOwnModel] = useState(MODELS[0].id);
   const model = controlledModel ?? ownModel;
   const pickModel = (next: string) => {
     if (controlledModel === undefined) setOwnModel(next);

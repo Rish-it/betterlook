@@ -5,7 +5,6 @@ import {Chat, useChat} from '@ai-sdk/react';
 import {DefaultChatTransport, type UIMessage} from 'ai';
 import * as stylex from '@stylexjs/stylex';
 import {AppShell} from '@astryxdesign/core/AppShell';
-import {Button} from '@astryxdesign/core/Button';
 import {
   ChatLayout,
   ChatMessage,
@@ -24,7 +23,7 @@ import {TopNav} from '@astryxdesign/core/TopNav';
 import {colorVars, radiusVars, spacingVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {Composer} from '@/composer/Composer';
 import {ModelPicker} from '@/composer/ModelPicker';
-import {MODELS} from '@/composer/models';
+import {MODELS} from '@/lib/agent/models';
 import type {ProviderCredential} from '@/lib/agent/types';
 
 const PROJECT_NAME = 'Untitled project';
@@ -146,7 +145,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
     maxSize: '70%',
     containerRef,
   });
-  const initialModelValue = MODELS.some(m => m.value === initialModel) ? initialModel : MODELS[0].value;
+  const initialModelValue = MODELS.some(m => m.id === initialModel) ? initialModel : MODELS[0].id;
   const [model, setModel] = useState(initialModelValue);
   // Owned here so StrictMode's simulated unmount cannot stop the first send.
   const [chat] = useState(() => new Chat<AgentMessage>({transport}));
@@ -227,7 +226,14 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
             {...stylex.props(styles.chat(resizable.size), view !== 'chat' && styles.hiddenWhenNarrow)}>
             <ChatLayout
               composer={
-                <Composer placeholder="Describe a change" onSubmit={send} model={model} onModelChange={setModel} />
+                <Composer
+                  placeholder="Describe a change"
+                  onSubmit={send}
+                  model={model}
+                  onModelChange={setModel}
+                  isStreaming={isBusy}
+                  onStop={stop}
+                />
               }>
               <ChatMessageList>
                 {messages.map(m => (
@@ -237,7 +243,7 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                       metadata={
                         m.metadata?.model && (
                           <Text type="supporting" color="secondary">
-                            {MODELS.find(x => x.value === m.metadata?.model)?.label}
+                            {MODELS.find(x => x.id === m.metadata?.model)?.label}
                           </Text>
                         )
                       }>
@@ -248,11 +254,6 @@ export function Workspace({prompt, model: initialModel}: {prompt: string; model:
                 {error && (
                   <ChatMessage sender="assistant">
                     <ChatMessageBubble variant="ghost">{error.message}</ChatMessageBubble>
-                  </ChatMessage>
-                )}
-                {isBusy && (
-                  <ChatMessage sender="assistant">
-                    <Button label="Stop" variant="secondary" size="sm" onClick={() => stop()} />
                   </ChatMessage>
                 )}
               </ChatMessageList>
